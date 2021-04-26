@@ -34,7 +34,7 @@ void TouchEventHandler::SendFlutterPointerEvent(FlutterPointerPhase phase,
                                                 double scroll_delta_x,
                                                 double scroll_delta_y,
                                                 size_t timestamp,
-                                                int multi_touch_device = 0) {
+                                                int device_id = 0) {
   if (!engine_->flutter_engine) {
     return;
   }
@@ -67,7 +67,7 @@ void TouchEventHandler::SendFlutterPointerEvent(FlutterPointerPhase phase,
   event.scroll_delta_x = scroll_delta_x;
   event.scroll_delta_y = scroll_delta_y;
   event.timestamp = timestamp * 1000;
-  event.device = multi_touch_device;
+  event.device = device_id;
   FlutterEngineSendPointerEvent(engine_->flutter_engine, &event, 1);
 }
 
