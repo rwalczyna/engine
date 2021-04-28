@@ -116,7 +116,6 @@ class TizenEmbedderEngine : public TizenRenderer::Delegate {
   const DeviceProfile device_profile;
 
  private:
-  static bool SurfacePresentCallback(void*, const void*, size_t, size_t);
   static bool MakeContextCurrent(void* user_data);
   static bool ClearContext(void* user_data);
   static bool Present(void* user_data);

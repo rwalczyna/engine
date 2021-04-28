@@ -177,7 +177,9 @@ bool TizenEmbedderEngine::RunEngine(
   } else {
     config.type = kSoftware;
     config.software.struct_size = sizeof(config.software);
-    config.software.surface_present_callback = SurfacePresentCallback;
+    config.software.surface_present_callback =
+        [](void* user_data, const void* allocation, size_t row_bytes,
+           size_t height) -> bool { return true; };
   }
 
   FlutterProjectArgs args = {};
@@ -406,14 +408,6 @@ FlutterDesktopMessage TizenEmbedderEngine::ConvertToDesktopMessage(
   message.message_size = engine_message.message_size;
   message.response_handle = engine_message.response_handle;
   return message;
-}
-
-bool TizenEmbedderEngine::SurfacePresentCallback(void* user_data,
-                                                 const void* allocation,
-                                                 size_t row_bytes,
-                                                 size_t height) {
-  FT_LOGD("SurfacePresentCallback");
-  return true;
 }
 
 bool TizenEmbedderEngine::MakeContextCurrent(void* user_data) {
