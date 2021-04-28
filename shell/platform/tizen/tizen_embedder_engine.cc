@@ -144,8 +144,8 @@ bool TizenEmbedderEngine::RunEngine(
   custom_task_runners.platform_task_runner = &platform_task_runner;
 
 #ifdef TIZEN_RENDERER_EVAS_GL
+  FlutterTaskRunnerDescription render_task_runner = {};
   if (HasTizenRenderer()) {
-    FlutterTaskRunnerDescription render_task_runner = {};
     render_task_runner.struct_size = sizeof(FlutterTaskRunnerDescription);
     render_task_runner.user_data = render_loop_.get();
     render_task_runner.runs_task_on_current_thread_callback =
