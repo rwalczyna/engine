@@ -112,6 +112,7 @@ template("embedder") {
     public = _public_headers
 
     sources = [
+      "channels/app_control_channel.cc",
       "channels/key_event_channel.cc",
       "channels/lifecycle_channel.cc",
       "channels/navigation_channel.cc",
@@ -162,6 +163,7 @@ template("embedder") {
         "base-utils-i18n",
         "capi-appfw-application",
         "capi-appfw-app-common",
+        "capi-appfw-app-control",
         "capi-base-common",
         "capi-system-info",
         "capi-system-system-settings",

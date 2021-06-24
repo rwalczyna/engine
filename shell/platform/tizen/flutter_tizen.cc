@@ -118,6 +118,11 @@ void FlutterDesktopMessengerSetCallback(FlutterDesktopMessengerRef messenger,
                                                             user_data);
 }
 
+void FlutterDesktopNotifyAppControl(FlutterDesktopEngineRef engine,
+                                    app_control_h app_control) {
+  EngineFromHandle(engine)->app_control_channel->NotifyAppControl(app_control);
+}
+
 void FlutterDesktopNotifyLocaleChange(FlutterDesktopEngineRef engine) {
   EngineFromHandle(engine)->SetupLocales();
 }

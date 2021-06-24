@@ -8,6 +8,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <app.h>
 
 #include "flutter_export.h"
 #include "flutter_messenger.h"
@@ -88,6 +89,10 @@ FlutterDesktopGetPluginRegistrar(FlutterDesktopEngineRef engine,
 // Returns the messenger associated with the engine.
 FLUTTER_EXPORT FlutterDesktopMessengerRef
 FlutterDesktopEngineGetMessenger(FlutterDesktopEngineRef engine);
+
+// Posts an app control to the engine instance.
+FLUTTER_EXPORT void FlutterDesktopNotifyAppControl(
+    FlutterDesktopEngineRef engine, app_control_h app_control);
 
 // Posts a locale change notification to the engine instance.
 FLUTTER_EXPORT void FlutterDesktopNotifyLocaleChange(
