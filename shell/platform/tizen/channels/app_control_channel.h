@@ -21,18 +21,15 @@ class FlutterTizenEngine;
 namespace flutter {
 
 struct AppControlResult {
-  AppControlResult() : valid(false){};
-  AppControlResult(int code) : error_code(code), valid(true) {}
+  AppControlResult() : error_code(APP_CONTROL_ERROR_NONE){};
+  AppControlResult(int code) : error_code(code) {}
 
   // Returns false on error
-  operator bool() const {
-    return valid && (APP_CONTROL_ERROR_NONE == error_code);
-  }
+  operator bool() const { return (APP_CONTROL_ERROR_NONE == error_code); }
 
   std::string message() { return get_error_message(error_code); }
 
   int error_code;
-  bool valid;
 };
 
 class AppControlExtraData {
@@ -122,10 +119,7 @@ class AppControl {
 
   AppControlResult Reply(AppControl* reply, Result result);
 
-  // AppControlResult AddExtraData(std::string key, std::string value);
   AppControlResult AddExtraData(std::string key, EncodableValue value);
-  // AppControlResult AddExtraData(std::string key,
-  //                               std::vector<std::string> value);
   AppControlResult ReadAllExtraData(std::string key, EncodableValue& value);
 
  private:
@@ -158,8 +152,6 @@ class AppControlChannel {
       std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> events);
   void UnregisterEventHandler();
   void SendAlreadyQueuedEvents();
-  bool ValidateAppControlResult(AppControlResult ret,
-                                MethodResult<EncodableValue>* result);
 
   template <typename T>
   bool GetValueFromArgs(const flutter::EncodableValue* args,
@@ -174,6 +166,16 @@ class AppControlChannel {
   void CreateAppControl(const EncodableValue* args,
                         std::unique_ptr<MethodResult<EncodableValue>> result);
 
+  void SendLaunchRequest(std::shared_ptr<AppControl> app_control,
+                         std::unique_ptr<MethodResult<EncodableValue>> result);
+  void SendTerminateRequest(
+      std::shared_ptr<AppControl> app_control,
+      std::unique_ptr<MethodResult<EncodableValue>> result);
+
+  void SetAppControlData(std::shared_ptr<AppControl> app_control,
+                         std::unique_ptr<MethodResult<EncodableValue>> result);
+  void SendAppControlDataEvent(std::shared_ptr<AppControl> app_control);
+
   std::unique_ptr<MethodChannel<EncodableValue>> method_channel_;
   std::unique_ptr<EventChannel<EncodableValue>> event_channel_;
   std::unique_ptr<EventSink<EncodableValue>> events_;
@@ -182,7 +184,7 @@ class AppControlChannel {
   // that EventChannel on Dart side will be registered
   // before native OnAppControl event
   // TODO: Add limit for queue elements
-  std::queue<int> queue_;
+  std::queue<std::shared_ptr<AppControl>> queue_;
 
   std::unordered_map<int, std::shared_ptr<AppControl>> map_;
 };

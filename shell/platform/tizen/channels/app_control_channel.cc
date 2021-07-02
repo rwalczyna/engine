@@ -46,14 +46,14 @@ AppControlChannel::~AppControlChannel() {}
 
 void AppControlChannel::NotifyAppControl(app_control_h app_control) {
   FT_LOGI("NotifyAppControl");
-  auto app = std::make_unique<AppControl>(app_control);
+  auto app = std::make_shared<AppControl>(app_control);
   if (!events_) {
-    queue_.push(app->GetId());
+    queue_.push(app);
     FT_LOGI("EventChannel not set yet");
   } else {
-    events_->Success(EncodableValue(app->GetId()));
+    SendAppControlDataEvent(app);
   }
-  map_.insert({app->GetId(), std::move(app)});
+  map_.insert({app->GetId(), app});
 }
 
 void AppControlChannel::HandleMethodCall(
@@ -76,80 +76,13 @@ void AppControlChannel::HandleMethodCall(
     return;
   }
 
-  AppControlResult ret;
   // Common
   if (method_name.compare("SendLaunchRequest") == 0) {
-    ret = app_control->SendLaunchRequest();
+    SendLaunchRequest(app_control, std::move(result));
   } else if (method_name.compare("SendTerminateRequest") == 0) {
-    ret = app_control->SendTerminateRequest();
-  }
-
-  if (ret.valid) {
-    if (ret) {
-      result->Success();
-    } else {
-      result->Error(ret.message());
-    }
-    return;
-  }
-
-  // Getters
-  std::string str;
-  if (method_name.compare("GetAppId") == 0) {
-    ret = app_control->GetAppId(str);
-  } else if (method_name.compare("GetOperation") == 0) {
-    ret = app_control->GetOperation(str);
-  } else if (method_name.compare("GetUri") == 0) {
-    ret = app_control->GetUri(str);
-  } else if (method_name.compare("GetMime") == 0) {
-    ret = app_control->GetMime(str);
-  } else if (method_name.compare("GetCategory") == 0) {
-    ret = app_control->GetMime(str);
-  } else if (method_name.compare("GetCaller") == 0) {
-    ret = app_control->GetMime(str);
-  } else if (method_name.compare("GetLaunchMode") == 0) {
-    ret = app_control->GetLaunchMode(str);
-  }
-
-  if (ret.valid) {
-    if (ret) {
-      result->Success(EncodableValue(str));
-    } else {
-      result->Error(ret.message());
-    }
-    return;
-  }
-
-  // Setters
-  if (!GetValueFromArgs<std::string>(arguments, "argument", str)) {
-    result->Error("Invalid argument");
-    return;
-  }
-
-  if (method_name.compare("SetAppId") == 0) {
-    ret = app_control->SetAppId(str);
-  } else if (method_name.compare("SetOperation") == 0) {
-    ret = app_control->SetOperation(str);
-    } else if (method_name.compare("SetUri") == 0) {
-    ret = app_control->SetUri(str);
-  } else if (method_name.compare("SetMime") == 0) {
-    ret = app_control->SetMime(str);
-  } else if (method_name.compare("SetCategory") == 0) {
-    ret = app_control->SetMime(str);
-  } else if (method_name.compare("SetCaller") == 0) {
-    ret = app_control->SetMime(str);
-  } else if (method_name.compare("SetLaunchMode") == 0) {
-    ret = app_control->SetLaunchMode(str);
-  }
-
-  if (ret.valid) {
-    if (ret) {
-      result->Success();
-    } else {
-      result->Error(ret.message());
-    }
+    SendTerminateRequest(app_control, std::move(result));
+  } else {
     result->NotImplemented();
-    return;
   }
 }
 
@@ -168,7 +101,7 @@ void AppControlChannel::UnregisterEventHandler() {
 void AppControlChannel::SendAlreadyQueuedEvents() {
   FT_LOGI("SendAlreadyQueuedEvents: %d", queue_.size());
   while (!queue_.empty()) {
-    events_->Success(EncodableValue(queue_.front()));
+    SendAppControlDataEvent(queue_.front());
     queue_.pop();
   }
 }
@@ -221,20 +154,6 @@ std::shared_ptr<AppControl> AppControlChannel::GetAppControl(
   return map_[id];
 }
 
-bool AppControlChannel::ValidateAppControlResult(
-    AppControlResult ret,
-    MethodResult<EncodableValue>* result) {
-  if (ret.valid) {
-    if (ret) {
-      result->Success();
-    } else {
-      result->Error(ret.message());
-    }
-    return true;
-  }
-  return false;
-}
-
 void AppControlChannel::CreateAppControl(
     const EncodableValue* args,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
@@ -248,6 +167,64 @@ void AppControlChannel::CreateAppControl(
   int id = app->GetId();
   map_.insert({app->GetId(), std::move(app)});
   result->Success(EncodableValue(id));
+}
+
+void AppControlChannel::SendLaunchRequest(
+    std::shared_ptr<AppControl> app_control,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  // TODO:: Run SetAppControlData
+  AppControlResult ret = app_control->SendLaunchRequest();
+  if (ret) {
+    result->Success();
+  } else {
+    result->Error(ret.message());
+  }
+}
+
+void AppControlChannel::SendTerminateRequest(
+    std::shared_ptr<AppControl> app_control,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  // TODO:: Run SetAppControlData
+  AppControlResult ret = app_control->SendTerminateRequest();
+  if (ret) {
+    result->Success();
+  } else {
+    result->Error(ret.message());
+  }
+}
+
+void AppControlChannel::SetAppControlData(
+    std::shared_ptr<AppControl> app_control,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  // TODO: Read all
+}
+
+void AppControlChannel::SendAppControlDataEvent(
+    std::shared_ptr<AppControl> app_control) {
+  std::string app_id, operation, mime, category, uri, caller_id;
+  AppControlResult results[7];
+  results[0] = app_control->GetAppId(app_id);
+  results[1] = app_control->GetOperation(operation);
+  results[3] = app_control->GetMime(mime);
+  results[4] = app_control->GetCategory(category);
+  results[5] = app_control->GetUri(uri);
+  // Caller Id is optional
+  app_control->GetCaller(caller_id);
+  // TODO: Read extra data
+  for (int i = 0; i < 7; i++) {
+    if (!results[i]) {
+      return;
+    }
+  }
+  EncodableMap map;
+  map[EncodableValue("appId")] = EncodableValue(app_id);
+  map[EncodableValue("operation")] = EncodableValue(operation);
+  map[EncodableValue("mime")] = EncodableValue(mime);
+  map[EncodableValue("category")] = EncodableValue(category);
+  map[EncodableValue("uri")] = EncodableValue(uri);
+  map[EncodableValue("callerId")] = EncodableValue(caller_id);
+
+  events_->Success(EncodableValue(map));
 }
 
 AppControl::AppControl(app_control_h app_control) : id_(next_id_++) {
