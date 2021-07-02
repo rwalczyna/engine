@@ -62,28 +62,94 @@ void AppControlChannel::HandleMethodCall(
   FT_LOGI("HandleMethodCall : %s", method_call.method_name().c_str());
   const auto arguments = method_call.arguments();
   const auto& method_name = method_call.method_name();
+
   // AppControl not needed
   if (method_name.compare("CreateAppControl") == 0) {
     CreateAppControl(arguments, std::move(result));
+    return;
   }
+
   // AppControl needed
-  if (method_name.compare("SendLaunchRequest") == 0) {
-    SendLaunchRequest(arguments, std::move(result));
-  } else if (method_name.compare("SendTerminateRequest") == 0) {
-    SendTerminateRequest(arguments, std::move(result));
+  auto app_control = GetAppControl(arguments);
+  if (app_control == nullptr) {
+    result->Error("Could not find app_control", "Invalid parameter");
+    return;
   }
-  // Getters Setters
+
+  AppControlResult ret;
+  // Common
+  if (method_name.compare("SendLaunchRequest") == 0) {
+    ret = app_control->SendLaunchRequest();
+  } else if (method_name.compare("SendTerminateRequest") == 0) {
+    ret = app_control->SendTerminateRequest();
+  }
+
+  if (ret.valid) {
+    if (ret) {
+      result->Success();
+    } else {
+      result->Error(ret.message());
+    }
+    return;
+  }
+
+  // Getters
+  std::string str;
   if (method_name.compare("GetAppId") == 0) {
-    GetAppId(arguments, std::move(result));
-  } else if (method_name.compare("SetAppId") == 0) {
-    SetAppId(arguments, std::move(result));
+    ret = app_control->GetAppId(str);
   } else if (method_name.compare("GetOperation") == 0) {
-    GetOperation(arguments, std::move(result));
+    ret = app_control->GetOperation(str);
+  } else if (method_name.compare("GetUri") == 0) {
+    ret = app_control->GetUri(str);
+  } else if (method_name.compare("GetMime") == 0) {
+    ret = app_control->GetMime(str);
+  } else if (method_name.compare("GetCategory") == 0) {
+    ret = app_control->GetMime(str);
+  } else if (method_name.compare("GetCaller") == 0) {
+    ret = app_control->GetMime(str);
+  } else if (method_name.compare("GetLaunchMode") == 0) {
+    ret = app_control->GetLaunchMode(str);
+  }
+
+  if (ret.valid) {
+    if (ret) {
+      result->Success(EncodableValue(str));
+    } else {
+      result->Error(ret.message());
+    }
+    return;
+  }
+
+  // Setters
+  if (!GetValueFromArgs<std::string>(arguments, "argument", str)) {
+    result->Error("Invalid argument");
+    return;
+  }
+
+  if (method_name.compare("SetAppId") == 0) {
+    ret = app_control->SetAppId(str);
   } else if (method_name.compare("SetOperation") == 0) {
-    SetOperation(arguments, std::move(result));
-  } else if (method_name.compare("ASDF") == 0) {
-  } else {
+    ret = app_control->SetOperation(str);
+    } else if (method_name.compare("SetUri") == 0) {
+    ret = app_control->SetUri(str);
+  } else if (method_name.compare("SetMime") == 0) {
+    ret = app_control->SetMime(str);
+  } else if (method_name.compare("SetCategory") == 0) {
+    ret = app_control->SetMime(str);
+  } else if (method_name.compare("SetCaller") == 0) {
+    ret = app_control->SetMime(str);
+  } else if (method_name.compare("SetLaunchMode") == 0) {
+    ret = app_control->SetLaunchMode(str);
+  }
+
+  if (ret.valid) {
+    if (ret) {
+      result->Success();
+    } else {
+      result->Error(ret.message());
+    }
     result->NotImplemented();
+    return;
   }
 }
 
@@ -156,9 +222,14 @@ std::shared_ptr<AppControl> AppControlChannel::GetAppControl(
 }
 
 bool AppControlChannel::ValidateAppControlResult(
-    AppControlResult app_control_result,
-    std::unique_ptr<MethodResult<EncodableValue>> result) {
-  if (app_control_result) {
+    AppControlResult ret,
+    MethodResult<EncodableValue>* result) {
+  if (ret.valid) {
+    if (ret) {
+      result->Success();
+    } else {
+      result->Error(ret.message());
+    }
     return true;
   }
   return false;
@@ -177,120 +248,6 @@ void AppControlChannel::CreateAppControl(
   int id = app->GetId();
   map_.insert({app->GetId(), std::move(app)});
   result->Success(EncodableValue(id));
-}
-
-void AppControlChannel::GetOperation(
-    const EncodableValue* args,
-    std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::GetOperation");
-  auto app_control = GetAppControl(args);
-  if (app_control == nullptr) {
-    result->Error("Could not execute GetOperation", "Invalid parameter");
-    return;
-  }
-  std::string str;
-  auto ret = app_control->GetOperation(str);
-  if (ret) {
-    result->Success(EncodableValue(str));
-  } else {
-    result->Error(ret.message());
-  }
-}
-
-void AppControlChannel::SetOperation(
-    const EncodableValue* args,
-    std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::SetOperation");
-  auto app_control = GetAppControl(args);
-  if (app_control == nullptr) {
-    result->Error("Could not execute SetOperation", "Invalid parameter");
-    return;
-  }
-  std::string str;
-  if (!GetValueFromArgs<std::string>(args, "argument", str)) {
-    result->Error("Invalid argument");
-    return;
-  }
-  auto ret = app_control->SetOperation(str);
-  if (ret) {
-    result->Success(EncodableValue(str));
-  } else {
-    result->Error(ret.message());
-  }
-}
-
-void AppControlChannel::SendLaunchRequest(
-    const EncodableValue* args,
-    std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::SendLaunchRequest");
-  auto app_control = GetAppControl(args);
-  if (app_control == nullptr) {
-    result->Error("Could not execute GetAppId", "Invalid parameter");
-    return;
-  }
-  auto ret = app_control->SendLaunchRequest();
-  if (ret) {
-    result->Success();
-  } else {
-    result->Error(ret.message());
-  }
-}
-
-void AppControlChannel::SendTerminateRequest(
-    const EncodableValue* args,
-    std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::SendTerminateRequest");
-  auto app_control = GetAppControl(args);
-  if (app_control == nullptr) {
-    result->Error("Could not execute GetAppId", "Invalid parameter");
-    return;
-  }
-  auto ret = app_control->SendTerminateRequest();
-  if (ret) {
-    result->Success();
-  } else {
-    result->Error(ret.message());
-  }
-}
-
-void AppControlChannel::GetAppId(
-    const EncodableValue* args,
-    std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::GetAppId");
-  auto app_control = GetAppControl(args);
-  if (app_control == nullptr) {
-    result->Error("Could not execute GetAppId", "Invalid parameter");
-    return;
-  }
-  std::string str;
-  auto ret = app_control->GetAppId(str);
-  if (ret) {
-    result->Success(EncodableValue(str));
-  } else {
-    result->Error(ret.message());
-  }
-}
-
-void AppControlChannel::SetAppId(
-    const EncodableValue* args,
-    std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::SetAppId");
-  auto app_control = GetAppControl(args);
-  if (app_control == nullptr) {
-    result->Error("Could not execute SetAppId", "Invalid parameter");
-    return;
-  }
-  std::string str;
-  if (!GetValueFromArgs<std::string>(args, "argument", str)) {
-    result->Error("Invalid argument");
-    return;
-  }
-  auto ret = app_control->SetAppId(str);
-  if (ret) {
-    result->Success(EncodableValue(str));
-  } else {
-    result->Error(ret.message());
-  }
 }
 
 AppControl::AppControl(app_control_h app_control) : id_(next_id_++) {
@@ -438,19 +395,24 @@ AppControlResult AppControl::GetCaller(std::string& caller) {
   return GetString(caller, app_control_get_caller);
 }
 
-AppControlResult AppControl::GetLaunchMode(LaunchMode& launch_mode) {
+AppControlResult AppControl::GetLaunchMode(std::string& launch_mode) {
   app_control_launch_mode_e launch_mode_e;
   int ret = app_control_get_launch_mode(handle_, &launch_mode_e);
   if (ret != APP_CONTROL_ERROR_NONE) {
     return AppControlResult(ret);
   }
-  launch_mode = static_cast<LaunchMode>(launch_mode_e);
+  launch_mode =
+      (launch_mode_e == APP_CONTROL_LAUNCH_MODE_SINGLE ? "Single" : "Group");
   return AppControlResult(APP_CONTROL_ERROR_NONE);
 }
 
-AppControlResult AppControl::SetLaunchMode(const LaunchMode launch_mode) {
-  app_control_launch_mode_e launch_mode_e =
-      static_cast<app_control_launch_mode_e>(launch_mode);
+AppControlResult AppControl::SetLaunchMode(const std::string& launch_mode) {
+  app_control_launch_mode_e launch_mode_e;
+  if (launch_mode.compare("Single")) {
+    launch_mode_e = APP_CONTROL_LAUNCH_MODE_SINGLE;
+  } else {
+    launch_mode_e = APP_CONTROL_LAUNCH_MODE_GROUP;
+  }
   int ret = app_control_set_launch_mode(handle_, launch_mode_e);
   return AppControlResult(ret);
 }

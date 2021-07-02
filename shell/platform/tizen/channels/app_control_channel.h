@@ -21,15 +21,18 @@ class FlutterTizenEngine;
 namespace flutter {
 
 struct AppControlResult {
-  AppControlResult() : error_code(APP_CONTROL_ERROR_NONE){};
-  AppControlResult(int code) : error_code(code) {}
+  AppControlResult() : valid(false){};
+  AppControlResult(int code) : error_code(code), valid(true) {}
 
   // Returns false on error
-  operator bool() const { return APP_CONTROL_ERROR_NONE == error_code; }
+  operator bool() const {
+    return valid && (APP_CONTROL_ERROR_NONE == error_code);
+  }
 
   std::string message() { return get_error_message(error_code); }
 
   int error_code;
+  bool valid;
 };
 
 class AppControlExtraData {
@@ -111,8 +114,8 @@ class AppControl {
   AppControlResult GetComponentId(std::string& component_id);
   AppControlResult SetComponentId(const std::string& component_id);
   AppControlResult GetCaller(std::string& caller);
-  AppControlResult GetLaunchMode(LaunchMode& launch_mode);
-  AppControlResult SetLaunchMode(const LaunchMode launch_mode);
+  AppControlResult GetLaunchMode(std::string& launch_mode);
+  AppControlResult SetLaunchMode(const std::string& launch_mode);
 
   AppControlResult SendLaunchRequest();
   AppControlResult SendTerminateRequest();
@@ -155,6 +158,8 @@ class AppControlChannel {
       std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> events);
   void UnregisterEventHandler();
   void SendAlreadyQueuedEvents();
+  bool ValidateAppControlResult(AppControlResult ret,
+                                MethodResult<EncodableValue>* result);
 
   template <typename T>
   bool GetValueFromArgs(const flutter::EncodableValue* args,
@@ -165,28 +170,9 @@ class AppControlChannel {
                                  flutter::EncodableValue& out);
 
   std::shared_ptr<AppControl> GetAppControl(const EncodableValue* args);
-  bool ValidateAppControlResult(
-      AppControlResult app_control_result,
-      std::unique_ptr<MethodResult<EncodableValue>> result);
 
   void CreateAppControl(const EncodableValue* args,
                         std::unique_ptr<MethodResult<EncodableValue>> result);
-
-  void SendLaunchRequest(const EncodableValue* args,
-                         std::unique_ptr<MethodResult<EncodableValue>> result);
-  void SendTerminateRequest(
-      const EncodableValue* args,
-      std::unique_ptr<MethodResult<EncodableValue>> result);
-
-  void GetOperation(const EncodableValue* args,
-                    std::unique_ptr<MethodResult<EncodableValue>> result);
-  void SetOperation(const EncodableValue* args,
-                    std::unique_ptr<MethodResult<EncodableValue>> result);
-
-  void GetAppId(const EncodableValue* args,
-                std::unique_ptr<MethodResult<EncodableValue>> result);
-  void SetAppId(const EncodableValue* args,
-                std::unique_ptr<MethodResult<EncodableValue>> result);
 
   std::unique_ptr<MethodChannel<EncodableValue>> method_channel_;
   std::unique_ptr<EventChannel<EncodableValue>> event_channel_;
