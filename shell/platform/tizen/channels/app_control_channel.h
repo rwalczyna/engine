@@ -20,9 +20,6 @@ class FlutterTizenEngine;
 
 namespace flutter {
 
-using EncodableList = std::vector<EncodableValue>;
-using EncodableMap = std::map<EncodableValue, EncodableValue>;
-
 struct AppControlResult {
   AppControlResult() : error_code(APP_CONTROL_ERROR_NONE){};
   AppControlResult(int code) : error_code(code) {}
@@ -69,7 +66,7 @@ class AppControlExtraData {
     return false;
   }
 
-  std::vector<std::string>& GetList(std::string key) {
+  std::vector<std::string>& GetVec(std::string key) {
     return strings_lists_[key];
   }
 
@@ -117,15 +114,28 @@ class AppControl {
   AppControlResult GetLaunchMode(LaunchMode& launch_mode);
   AppControlResult SetLaunchMode(const LaunchMode launch_mode);
 
+  AppControlResult SendLaunchRequest();
+  AppControlResult SendTerminateRequest();
+
   AppControlResult Reply(AppControl* reply, Result result);
+
+  // AppControlResult AddExtraData(std::string key, std::string value);
+  AppControlResult AddExtraData(std::string key, EncodableValue value);
+  // AppControlResult AddExtraData(std::string key,
+  //                               std::vector<std::string> value);
+  AppControlResult ReadAllExtraData(std::string key, EncodableValue& value);
 
  private:
   AppControlResult GetString(std::string& str, int func(app_control_h, char**));
   AppControlResult SetString(const std::string& str,
                              int func(app_control_h, const char*));
-  AppControlResult ReadExtraData();
+  AppControlResult ReadAllExtraData(EncodableValue& value);
+  AppControlResult WriteExtraDataStringToHandle();
+  AppControlResult WriteExtraDataToHandle();
 
-  AppControlExtraData extra_data_;
+  AppControlResult AddExtraDataList(std::string& key, EncodableList& list);
+
+  EncodableMap extra_data_;
   app_control_h handle_;
   int id_;
   static int next_id_;
@@ -145,11 +155,42 @@ class AppControlChannel {
       std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> events);
   void UnregisterEventHandler();
   void SendAlreadyQueuedEvents();
-  void GetOperation(std::unique_ptr<MethodResult<EncodableValue>> result);
+
+  template <typename T>
+  bool GetValueFromArgs(const flutter::EncodableValue* args,
+                        const char* key,
+                        T& out);
+  bool GetEncodableValueFromArgs(const flutter::EncodableValue* args,
+                                 const char* key,
+                                 flutter::EncodableValue& out);
+
+  std::shared_ptr<AppControl> GetAppControl(const EncodableValue* args);
+  bool ValidateAppControlResult(
+      AppControlResult app_control_result,
+      std::unique_ptr<MethodResult<EncodableValue>> result);
+
+  void CreateAppControl(const EncodableValue* args,
+                        std::unique_ptr<MethodResult<EncodableValue>> result);
+
+  void SendLaunchRequest(const EncodableValue* args,
+                         std::unique_ptr<MethodResult<EncodableValue>> result);
+  void SendTerminateRequest(
+      const EncodableValue* args,
+      std::unique_ptr<MethodResult<EncodableValue>> result);
+
+  void GetOperation(const EncodableValue* args,
+                    std::unique_ptr<MethodResult<EncodableValue>> result);
+  void SetOperation(const EncodableValue* args,
+                    std::unique_ptr<MethodResult<EncodableValue>> result);
+
+  void GetAppId(const EncodableValue* args,
+                std::unique_ptr<MethodResult<EncodableValue>> result);
+  void SetAppId(const EncodableValue* args,
+                std::unique_ptr<MethodResult<EncodableValue>> result);
 
   std::unique_ptr<MethodChannel<EncodableValue>> method_channel_;
   std::unique_ptr<EventChannel<EncodableValue>> event_channel_;
-  std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> events_;
+  std::unique_ptr<EventSink<EncodableValue>> events_;
 
   // We need this queue, because there is no quarantee
   // that EventChannel on Dart side will be registered
@@ -157,7 +198,7 @@ class AppControlChannel {
   // TODO: Add limit for queue elements
   std::queue<int> queue_;
 
-  std::unordered_map<int, std::unique_ptr<AppControl>> map_;
+  std::unordered_map<int, std::shared_ptr<AppControl>> map_;
 };
 
 }  // namespace flutter

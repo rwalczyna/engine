@@ -7,12 +7,12 @@
 
 namespace flutter {
 
-static constexpr char kChannelName[] = "tizen/app_control";
-static constexpr char kEventChannelName[] = "tizen/app_control_event";
+static constexpr char kChannelName[] = "tizen/internal/app_control_method";
+static constexpr char kEventChannelName[] = "tizen/internal/app_control_event";
 int AppControl::next_id_ = 0;
 
 AppControlChannel::AppControlChannel(BinaryMessenger* messenger) {
-  FT_LOGE("AppControlChannel");
+  FT_LOGI("AppControlChannel");
   method_channel_ = std::make_unique<MethodChannel<EncodableValue>>(
       messenger, kChannelName, &StandardMethodCodec::GetInstance());
 
@@ -28,13 +28,13 @@ AppControlChannel::AppControlChannel(BinaryMessenger* messenger) {
           [this](const flutter::EncodableValue* arguments,
                  std::unique_ptr<flutter::EventSink<>>&& events)
               -> std::unique_ptr<flutter::StreamHandlerError<>> {
-            FT_LOGE("OnListen");
+            FT_LOGI("OnListen");
             RegisterEventHandler(std::move(events));
             return nullptr;
           },
           [this](const flutter::EncodableValue* arguments)
               -> std::unique_ptr<flutter::StreamHandlerError<>> {
-            FT_LOGE("OnCancel");
+            FT_LOGI("OnCancel");
             UnregisterEventHandler();
             return nullptr;
           });
@@ -45,11 +45,11 @@ AppControlChannel::AppControlChannel(BinaryMessenger* messenger) {
 AppControlChannel::~AppControlChannel() {}
 
 void AppControlChannel::NotifyAppControl(app_control_h app_control) {
-  FT_LOGE("NotifyAppControl");
+  FT_LOGI("NotifyAppControl");
   auto app = std::make_unique<AppControl>(app_control);
   if (!events_) {
     queue_.push(app->GetId());
-    FT_LOGE("EventChannel not set yet");
+    FT_LOGI("EventChannel not set yet");
   } else {
     events_->Success(EncodableValue(app->GetId()));
   }
@@ -59,11 +59,29 @@ void AppControlChannel::NotifyAppControl(app_control_h app_control) {
 void AppControlChannel::HandleMethodCall(
     const MethodCall<EncodableValue>& method_call,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGE("HandleMethodCall : %s", method_call.method_name().data());
-  // const auto& arguments = *method_call.arguments();
-
-  if (method_call.method_name().compare("GetOperation") == 0) {
-    GetOperation(std::move(result));
+  FT_LOGI("HandleMethodCall : %s", method_call.method_name().c_str());
+  const auto arguments = method_call.arguments();
+  const auto& method_name = method_call.method_name();
+  // AppControl not needed
+  if (method_name.compare("CreateAppControl") == 0) {
+    CreateAppControl(arguments, std::move(result));
+  }
+  // AppControl needed
+  if (method_name.compare("SendLaunchRequest") == 0) {
+    SendLaunchRequest(arguments, std::move(result));
+  } else if (method_name.compare("SendTerminateRequest") == 0) {
+    SendTerminateRequest(arguments, std::move(result));
+  }
+  // Getters Setters
+  if (method_name.compare("GetAppId") == 0) {
+    GetAppId(arguments, std::move(result));
+  } else if (method_name.compare("SetAppId") == 0) {
+    SetAppId(arguments, std::move(result));
+  } else if (method_name.compare("GetOperation") == 0) {
+    GetOperation(arguments, std::move(result));
+  } else if (method_name.compare("SetOperation") == 0) {
+    SetOperation(arguments, std::move(result));
+  } else if (method_name.compare("ASDF") == 0) {
   } else {
     result->NotImplemented();
   }
@@ -71,36 +89,212 @@ void AppControlChannel::HandleMethodCall(
 
 void AppControlChannel::RegisterEventHandler(
     std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> events) {
-  FT_LOGE("RegisterEventHandler");
+  FT_LOGI("RegisterEventHandler");
   events_ = std::move(events);
   SendAlreadyQueuedEvents();
 }
 
 void AppControlChannel::UnregisterEventHandler() {
-  FT_LOGE("UnregisterEventHandler");
+  FT_LOGI("UnregisterEventHandler");
   events_.reset();
 }
 
 void AppControlChannel::SendAlreadyQueuedEvents() {
-  FT_LOGE("HandleMethodCall: %d", queue_.size());
+  FT_LOGI("SendAlreadyQueuedEvents: %d", queue_.size());
   while (!queue_.empty()) {
     events_->Success(EncodableValue(queue_.front()));
     queue_.pop();
   }
 }
 
-void AppControlChannel::GetOperation(
+template <typename T>
+bool AppControlChannel::GetValueFromArgs(const flutter::EncodableValue* args,
+                                         const char* key,
+                                         T& out) {
+  if (std::holds_alternative<flutter::EncodableMap>(*args)) {
+    flutter::EncodableMap map = std::get<flutter::EncodableMap>(*args);
+    if (map.find(flutter::EncodableValue(key)) != map.end()) {
+      flutter::EncodableValue value = map[flutter::EncodableValue(key)];
+      if (std::holds_alternative<T>(value)) {
+        out = std::get<T>(value);
+        return true;
+      }
+    }
+    FT_LOGI("Key %s not found", key);
+  }
+  return false;
+}
+
+bool AppControlChannel::GetEncodableValueFromArgs(
+    const flutter::EncodableValue* args,
+    const char* key,
+    flutter::EncodableValue& out) {
+  if (std::holds_alternative<flutter::EncodableMap>(*args)) {
+    flutter::EncodableMap map = std::get<flutter::EncodableMap>(*args);
+    if (map.find(flutter::EncodableValue(key)) != map.end()) {
+      out = map[flutter::EncodableValue(key)];
+      return true;
+    }
+  }
+  return false;
+}
+
+std::shared_ptr<AppControl> AppControlChannel::GetAppControl(
+    const EncodableValue* args) {
+  int id;
+  if (!GetValueFromArgs<int>(args, "id", id)) {
+    FT_LOGE("Could not find AppControl with id %d", id);
+    return nullptr;
+  }
+
+  if (map_.find(id) == map_.end()) {
+    FT_LOGE("Could not find AppControl with id %d", id);
+    return nullptr;
+  }
+  FT_LOGI("Found AppControl: %d", id);
+  return map_[id];
+}
+
+bool AppControlChannel::ValidateAppControlResult(
+    AppControlResult app_control_result,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
-  if (queue_.empty()) {
-    result->Error("No app_control");
+  if (app_control_result) {
+    return true;
+  }
+  return false;
+}
+
+void AppControlChannel::CreateAppControl(
+    const EncodableValue* args,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  FT_LOGI("AppControlChannel::CreateAppControl");
+  app_control_h app_control = nullptr;
+  AppControlResult ret = app_control_create(&app_control);
+  if (!ret) {
+    result->Error("Could not create AppControl", ret.message());
+  }
+  auto app = std::make_unique<AppControl>(app_control);
+  int id = app->GetId();
+  map_.insert({app->GetId(), std::move(app)});
+  result->Success(EncodableValue(id));
+}
+
+void AppControlChannel::GetOperation(
+    const EncodableValue* args,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  FT_LOGI("AppControlChannel::GetOperation");
+  auto app_control = GetAppControl(args);
+  if (app_control == nullptr) {
+    result->Error("Could not execute GetOperation", "Invalid parameter");
     return;
   }
-  result->Success(EncodableValue(queue_.size()));
-  return;
+  std::string str;
+  auto ret = app_control->GetOperation(str);
+  if (ret) {
+    result->Success(EncodableValue(str));
+  } else {
+    result->Error(ret.message());
+  }
+}
+
+void AppControlChannel::SetOperation(
+    const EncodableValue* args,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  FT_LOGI("AppControlChannel::SetOperation");
+  auto app_control = GetAppControl(args);
+  if (app_control == nullptr) {
+    result->Error("Could not execute SetOperation", "Invalid parameter");
+    return;
+  }
+  std::string str;
+  if (!GetValueFromArgs<std::string>(args, "argument", str)) {
+    result->Error("Invalid argument");
+    return;
+  }
+  auto ret = app_control->SetOperation(str);
+  if (ret) {
+    result->Success(EncodableValue(str));
+  } else {
+    result->Error(ret.message());
+  }
+}
+
+void AppControlChannel::SendLaunchRequest(
+    const EncodableValue* args,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  FT_LOGI("AppControlChannel::SendLaunchRequest");
+  auto app_control = GetAppControl(args);
+  if (app_control == nullptr) {
+    result->Error("Could not execute GetAppId", "Invalid parameter");
+    return;
+  }
+  auto ret = app_control->SendLaunchRequest();
+  if (ret) {
+    result->Success();
+  } else {
+    result->Error(ret.message());
+  }
+}
+
+void AppControlChannel::SendTerminateRequest(
+    const EncodableValue* args,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  FT_LOGI("AppControlChannel::SendTerminateRequest");
+  auto app_control = GetAppControl(args);
+  if (app_control == nullptr) {
+    result->Error("Could not execute GetAppId", "Invalid parameter");
+    return;
+  }
+  auto ret = app_control->SendTerminateRequest();
+  if (ret) {
+    result->Success();
+  } else {
+    result->Error(ret.message());
+  }
+}
+
+void AppControlChannel::GetAppId(
+    const EncodableValue* args,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  FT_LOGI("AppControlChannel::GetAppId");
+  auto app_control = GetAppControl(args);
+  if (app_control == nullptr) {
+    result->Error("Could not execute GetAppId", "Invalid parameter");
+    return;
+  }
+  std::string str;
+  auto ret = app_control->GetAppId(str);
+  if (ret) {
+    result->Success(EncodableValue(str));
+  } else {
+    result->Error(ret.message());
+  }
+}
+
+void AppControlChannel::SetAppId(
+    const EncodableValue* args,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  FT_LOGI("AppControlChannel::SetAppId");
+  auto app_control = GetAppControl(args);
+  if (app_control == nullptr) {
+    result->Error("Could not execute SetAppId", "Invalid parameter");
+    return;
+  }
+  std::string str;
+  if (!GetValueFromArgs<std::string>(args, "argument", str)) {
+    result->Error("Invalid argument");
+    return;
+  }
+  auto ret = app_control->SetAppId(str);
+  if (ret) {
+    result->Success(EncodableValue(str));
+  } else {
+    result->Error(ret.message());
+  }
 }
 
 AppControl::AppControl(app_control_h app_control) : id_(next_id_++) {
-  FT_LOGE("AppControl construct: %d", id_);
+  FT_LOGI("AppControl construct: %d", id_);
   int ret = app_control_clone(&handle_, app_control);
   if (ret != APP_CONTROL_ERROR_NONE) {
     FT_LOGE("Could not clone app control handle");
@@ -110,26 +304,30 @@ AppControl::AppControl(app_control_h app_control) : id_(next_id_++) {
 }
 
 AppControl::~AppControl() {
-  FT_LOGE("AppControl destruct: %d", id_);
+  FT_LOGI("AppControl destruct: %d", id_);
   app_control_destroy(handle_);
 }
 
 AppControlResult AppControl::GetString(std::string& str,
                                        int func(app_control_h, char**)) {
-  FT_LOGD("AppControl::GetString");
+  FT_LOGI("AppControl::GetString");
   char* op;
-  int ret = func(handle_, &op);
-  if (ret != APP_CONTROL_ERROR_NONE) {
-    return AppControlResult(ret);
+  AppControlResult ret = func(handle_, &op);
+  if (!ret) {
+    return ret;
   }
-  str = std::string{op};
-  free(op);
+  if (op != nullptr) {
+    str = std::string{op};
+    free(op);
+  } else {
+    str = "";
+  }
   return AppControlResult(APP_CONTROL_ERROR_NONE);
 }
 
 AppControlResult AppControl::SetString(const std::string& str,
                                        int func(app_control_h, const char*)) {
-  FT_LOGD("AppControl::SetString");
+  FT_LOGI("AppControl::SetString: %s", str.c_str());
   int ret = func(handle_, str.c_str());
   return AppControlResult(ret);
 }
@@ -137,7 +335,7 @@ AppControlResult AppControl::SetString(const std::string& str,
 bool _app_control_extra_data_cb(app_control_h app,
                                 const char* key,
                                 void* user_data) {
-  auto extra_data = static_cast<AppControlExtraData*>(user_data);
+  auto extra_data = static_cast<EncodableMap*>(user_data);
   bool is_array = false;
   int ret = app_control_is_extra_data_array(app, key, &is_array);
   if (ret != APP_CONTROL_ERROR_NONE) {
@@ -153,13 +351,14 @@ bool _app_control_extra_data_cb(app_control_h app,
       FT_LOGE("app_control_get_extra_data() failed at key %s", key);
       return false;
     }
-    std::vector<std::string> vec;
+    EncodableList list;
     for (int i = 0; i < length; i++) {
-      vec.push_back(strings[i]);
+      list.push_back(EncodableValue(std::string(strings[i])));
       free(strings[i]);
     }
     free(strings);
-    extra_data->Add(key, vec);
+    extra_data->insert(
+        {EncodableValue(std::string(key)), EncodableValue(list)});
   } else {
     char* value;
     ret = app_control_get_extra_data(app, key, &value);
@@ -167,16 +366,21 @@ bool _app_control_extra_data_cb(app_control_h app,
       FT_LOGE("app_control_get_extra_data() failed at key %s", key);
       return false;
     }
-    extra_data->Add(key, value);
+    extra_data->insert(
+        {EncodableValue(std::string(key)), EncodableValue(std::string(value))});
     free(value);
   }
 
   return true;
 }
 
-AppControlResult AppControl::ReadExtraData() {
+AppControlResult AppControl::ReadAllExtraData(EncodableValue& value) {
+  EncodableMap extra_data;
   int ret = app_control_foreach_extra_data(handle_, _app_control_extra_data_cb,
-                                           &extra_data_);
+                                           &extra_data);
+  if (ret == APP_CONTROL_ERROR_NONE) {
+    value = EncodableValue(extra_data);
+  }
   return AppControlResult(ret);
 }
 
@@ -251,6 +455,17 @@ AppControlResult AppControl::SetLaunchMode(const LaunchMode launch_mode) {
   return AppControlResult(ret);
 }
 
+AppControlResult AppControl::SendLaunchRequest() {
+  AppControlResult ret =
+      app_control_send_launch_request(handle_, nullptr, nullptr);
+  return ret;
+}
+
+AppControlResult AppControl::SendTerminateRequest() {
+  AppControlResult ret = app_control_send_terminate_request(handle_);
+  return ret;
+}
+
 AppControlResult AppControl::Reply(AppControl* reply, Result result) {
   app_control_result_e result_e = static_cast<app_control_result_e>(result);
   int ret = app_control_reply_to_launch_request(reply->Handle(), this->handle_,
@@ -258,4 +473,41 @@ AppControlResult AppControl::Reply(AppControl* reply, Result result) {
   return AppControlResult(ret);
 }
 
+AppControlResult AppControl::AddExtraData(std::string key,
+                                          EncodableValue value) {
+  bool is_array = std::holds_alternative<EncodableList>(value);
+  if (is_array) {
+    EncodableList& list = std::get<EncodableList>(value);
+    return AddExtraDataList(key, list);
+  } else {
+    bool is_string = std::holds_alternative<std::string>(value);
+    if (is_string) {
+      int ret = app_control_add_extra_data(
+          handle_, key.c_str(), std::get<std::string>(value).c_str());
+      return AppControlResult(ret);
+    } else {
+      return AppControlResult(APP_ERROR_INVALID_PARAMETER);
+    }
+  }
+  return AppControlResult(APP_CONTROL_ERROR_NONE);
+}
+
+AppControlResult AppControl::AddExtraDataList(std::string& key,
+                                              EncodableList& list) {
+  size_t length = list.size();
+  auto strings = new const char*[length];
+  for (size_t i = 0; i < length; i++) {
+    bool is_string = std::holds_alternative<std::string>(list[i]);
+    if (is_string) {
+      strings[i] = std::get<std::string>(list[i]).c_str();
+    } else {
+      delete[] strings;
+      return AppControlResult(APP_ERROR_INVALID_PARAMETER);
+    }
+  }
+  int ret =
+      app_control_add_extra_data_array(handle_, key.c_str(), strings, length);
+  delete[] strings;
+  return AppControlResult(ret);
+}
 }  // namespace flutter
