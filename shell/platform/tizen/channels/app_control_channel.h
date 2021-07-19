@@ -119,20 +119,20 @@ class AppControl {
 
   AppControlResult Reply(AppControl* reply, Result result);
 
-  AppControlResult AddExtraData(std::string key, EncodableValue value);
-  AppControlResult ReadAllExtraData(std::string key, EncodableValue& value);
+  AppControlResult GetExtraData(EncodableValue& value);
+  AppControlResult SetExtraData(EncodableValue& value);
 
  private:
   AppControlResult GetString(std::string& str, int func(app_control_h, char**));
   AppControlResult SetString(const std::string& str,
                              int func(app_control_h, const char*));
-  AppControlResult ReadAllExtraData(EncodableValue& value);
   AppControlResult WriteExtraDataStringToHandle();
   AppControlResult WriteExtraDataToHandle();
 
+  AppControlResult AddExtraData(std::string key, EncodableValue value);
   AppControlResult AddExtraDataList(std::string& key, EncodableList& list);
 
-  EncodableMap extra_data_;
+  // EncodableMap extra_data_;
   app_control_h handle_;
   int id_;
   static int next_id_;
@@ -166,14 +166,19 @@ class AppControlChannel {
   void CreateAppControl(const EncodableValue* args,
                         std::unique_ptr<MethodResult<EncodableValue>> result);
 
+  void Dispose(std::shared_ptr<AppControl> app_control,
+               std::unique_ptr<MethodResult<EncodableValue>> result);
   void SendLaunchRequest(std::shared_ptr<AppControl> app_control,
+                         const flutter::EncodableValue* arguments,
                          std::unique_ptr<MethodResult<EncodableValue>> result);
   void SendTerminateRequest(
       std::shared_ptr<AppControl> app_control,
+      const flutter::EncodableValue* arguments,
       std::unique_ptr<MethodResult<EncodableValue>> result);
 
-  void SetAppControlData(std::shared_ptr<AppControl> app_control,
-                         std::unique_ptr<MethodResult<EncodableValue>> result);
+  bool SetAppControlData(std::shared_ptr<AppControl> app_control,
+                         const flutter::EncodableValue* arguments,
+                         MethodResult<EncodableValue>* result);
   void SendAppControlDataEvent(std::shared_ptr<AppControl> app_control);
 
   std::unique_ptr<MethodChannel<EncodableValue>> method_channel_;

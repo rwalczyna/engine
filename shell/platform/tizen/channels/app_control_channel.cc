@@ -46,7 +46,13 @@ AppControlChannel::~AppControlChannel() {}
 
 void AppControlChannel::NotifyAppControl(app_control_h app_control) {
   FT_LOGI("NotifyAppControl");
-  auto app = std::make_shared<AppControl>(app_control);
+  app_control_h clone = nullptr;
+  AppControlResult ret = app_control_clone(&clone, app_control);
+  if (!ret) {
+    FT_LOGE("Could not clone app_control: %s", ret.message().c_str());
+    return;
+  }
+  auto app = std::make_shared<AppControl>(clone);
   if (!events_) {
     queue_.push(app);
     FT_LOGI("EventChannel not set yet");
@@ -77,10 +83,12 @@ void AppControlChannel::HandleMethodCall(
   }
 
   // Common
-  if (method_name.compare("SendLaunchRequest") == 0) {
-    SendLaunchRequest(app_control, std::move(result));
-  } else if (method_name.compare("SendTerminateRequest") == 0) {
-    SendTerminateRequest(app_control, std::move(result));
+  if (method_name.compare("dispose") == 0) {
+    Dispose(app_control, std::move(result));
+  } else if (method_name.compare("sendLaunchRequest") == 0) {
+    SendLaunchRequest(app_control, arguments, std::move(result));
+  } else if (method_name.compare("sendTerminateRequest") == 0) {
+    SendTerminateRequest(app_control, arguments, std::move(result));
   } else {
     result->NotImplemented();
   }
@@ -169,10 +177,20 @@ void AppControlChannel::CreateAppControl(
   result->Success(EncodableValue(id));
 }
 
-void AppControlChannel::SendLaunchRequest(
+void AppControlChannel::Dispose(
     std::shared_ptr<AppControl> app_control,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
-  // TODO:: Run SetAppControlData
+  map_.erase(app_control->GetId());
+  result->Success();
+}
+
+void AppControlChannel::SendLaunchRequest(
+    std::shared_ptr<AppControl> app_control,
+    const flutter::EncodableValue* arguments,
+    std::unique_ptr<MethodResult<EncodableValue>> result) {
+  if (!SetAppControlData(app_control, arguments, result.get())) {
+    return;
+  }
   AppControlResult ret = app_control->SendLaunchRequest();
   if (ret) {
     result->Success();
@@ -183,35 +201,77 @@ void AppControlChannel::SendLaunchRequest(
 
 void AppControlChannel::SendTerminateRequest(
     std::shared_ptr<AppControl> app_control,
+    const flutter::EncodableValue* arguments,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
-  // TODO:: Run SetAppControlData
+  if (!SetAppControlData(app_control, arguments, result.get())) {
+    return;
+  }
   AppControlResult ret = app_control->SendTerminateRequest();
   if (ret) {
     result->Success();
   } else {
-    result->Error(ret.message());
+    result->Error("Could not terminate", ret.message());
   }
 }
 
-void AppControlChannel::SetAppControlData(
+bool AppControlChannel::SetAppControlData(
     std::shared_ptr<AppControl> app_control,
-    std::unique_ptr<MethodResult<EncodableValue>> result) {
-  // TODO: Read all
+    const flutter::EncodableValue* arguments,
+    MethodResult<EncodableValue>* result) {
+  std::string app_id, operation, mime, category, uri;
+  EncodableValue extra_data;
+  GetValueFromArgs<std::string>(arguments, "appId", app_id);
+  GetValueFromArgs<std::string>(arguments, "operation", operation);
+  GetValueFromArgs<std::string>(arguments, "mime", mime);
+  GetValueFromArgs<std::string>(arguments, "category", category);
+  GetValueFromArgs<std::string>(arguments, "uri", uri);
+  if (std::holds_alternative<flutter::EncodableMap>(*arguments)) {
+    flutter::EncodableMap map = std::get<flutter::EncodableMap>(*arguments);
+    EncodableValue key = EncodableValue("extraData");
+    if (map.find(key) != map.end()) {
+      extra_data = map[key];
+    }
+  }
+  AppControlResult results[5];
+  results[0] = app_control->SetAppId(app_id);
+  if (!operation.empty()) {
+    results[1] = app_control->SetOperation(operation);
+  }
+  if (!mime.empty()) {
+    results[2] = app_control->SetMime(mime);
+  }
+  if (!category.empty()) {
+    results[3] = app_control->SetCategory(category);
+  }
+  if (!uri.empty()) {
+    results[4] = app_control->SetUri(uri);
+  }
+  app_control->SetExtraData(extra_data);
+  for (int i = 0; i < 5; i++) {
+    if (!results[i]) {
+      result->Error("Could not set value for app control",
+                    results[i].message());
+      return false;
+    }
+  }
+  return true;
 }
 
 void AppControlChannel::SendAppControlDataEvent(
     std::shared_ptr<AppControl> app_control) {
   std::string app_id, operation, mime, category, uri, caller_id;
-  AppControlResult results[7];
+  AppControlResult results[6];
   results[0] = app_control->GetAppId(app_id);
   results[1] = app_control->GetOperation(operation);
-  results[3] = app_control->GetMime(mime);
-  results[4] = app_control->GetCategory(category);
-  results[5] = app_control->GetUri(uri);
+  results[2] = app_control->GetMime(mime);
+  results[3] = app_control->GetCategory(category);
+  results[4] = app_control->GetUri(uri);
   // Caller Id is optional
   app_control->GetCaller(caller_id);
-  // TODO: Read extra data
-  for (int i = 0; i < 7; i++) {
+  EncodableValue extra_data;
+  // TODO: verify ret
+  app_control->GetExtraData(extra_data);
+  for (int i = 0; i < 5; i++) {
     if (!results[i]) {
       return;
     }
@@ -223,18 +283,14 @@ void AppControlChannel::SendAppControlDataEvent(
   map[EncodableValue("category")] = EncodableValue(category);
   map[EncodableValue("uri")] = EncodableValue(uri);
   map[EncodableValue("callerId")] = EncodableValue(caller_id);
+  map[EncodableValue("extraData")] = extra_data;
 
   events_->Success(EncodableValue(map));
 }
 
 AppControl::AppControl(app_control_h app_control) : id_(next_id_++) {
   FT_LOGI("AppControl construct: %d", id_);
-  int ret = app_control_clone(&handle_, app_control);
-  if (ret != APP_CONTROL_ERROR_NONE) {
-    FT_LOGE("Could not clone app control handle");
-    handle_ = nullptr;
-    return;
-  }
+  handle_ = app_control;
 }
 
 AppControl::~AppControl() {
@@ -308,7 +364,7 @@ bool _app_control_extra_data_cb(app_control_h app,
   return true;
 }
 
-AppControlResult AppControl::ReadAllExtraData(EncodableValue& value) {
+AppControlResult AppControl::GetExtraData(EncodableValue& value) {
   EncodableMap extra_data;
   int ret = app_control_foreach_extra_data(handle_, _app_control_extra_data_cb,
                                            &extra_data);
@@ -316,6 +372,33 @@ AppControlResult AppControl::ReadAllExtraData(EncodableValue& value) {
     value = EncodableValue(extra_data);
   }
   return AppControlResult(ret);
+}
+
+AppControlResult AppControl::SetExtraData(EncodableValue& value) {
+  if (std::holds_alternative<flutter::EncodableMap>(value)) {
+    EncodableMap map = std::get<EncodableMap>(value);
+    for (const auto& v : map) {
+      if (!std::holds_alternative<std::string>(v.first)) {
+        FT_LOGE("Key for extra data has to be string, omitting");
+        continue;
+      }
+      std::string key = std::get<std::string>(v.first);
+      // if (std::holds_alternative<std::string>(v.second)) {
+      //   std::string string_value = std::get<std::string>(v.second);
+      //   AddExtraData(key, string_value);
+      // } else if (std::holds_alternative<EncodableList>(v.second)) {
+      //   EncodableList list_value = std::get<EncodableList>(v.second);
+      //   AddExtraDataList(key, list_value);
+      // } else {
+      //   FT_LOGE("Invalid type, omitting");
+      //   continue;
+      // }
+      AddExtraData(key, v.second);
+    }
+  } else {
+    return AppControlResult(APP_ERROR_INVALID_PARAMETER);
+  }
+  return AppControlResult();
 }
 
 AppControlResult AppControl::GetOperation(std::string& operation) {
@@ -401,6 +484,7 @@ AppControlResult AppControl::SendLaunchRequest() {
 }
 
 AppControlResult AppControl::SendTerminateRequest() {
+  FT_LOGI("AppControlChannel::SendTerminateRequest");
   AppControlResult ret = app_control_send_terminate_request(handle_);
   return ret;
 }
