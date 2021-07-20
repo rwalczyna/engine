@@ -32,60 +32,9 @@ struct AppControlResult {
   int error_code;
 };
 
-class AppControlExtraData {
- public:
-  AppControlExtraData() {}
-  ~AppControlExtraData() {}
-
-  void Add(std::string key, std::string value) {
-    if (strings_lists_.find(key) != strings_lists_.end()) {
-      strings_lists_.erase(key);
-    }
-    strings_[key] = value;
-  }
-
-  void Add(std::string key, std::vector<std::string> value) {
-    if (strings_.find(key) != strings_.end()) {
-      strings_.erase(key);
-    }
-    strings_lists_[key] = value;
-  }
-
-  void Remove(std::string key) {
-    strings_.erase(key);
-    strings_lists_.erase(key);
-  }
-
-  bool Has(std::string key) {
-    if (strings_.find(key) != strings_.end()) {
-      return true;
-    }
-    if (strings_lists_.find(key) != strings_lists_.end()) {
-      return true;
-    }
-    return false;
-  }
-
-  std::vector<std::string>& GetVec(std::string key) {
-    return strings_lists_[key];
-  }
-
-  std::string& GetString(std::string key) { return strings_[key]; }
-
-  size_t Size() { return strings_.size() + strings_lists_.size(); }
-
- private:
-  std::unordered_map<std::string, std::string> strings_;
-  std::unordered_map<std::string, std::vector<std::string>> strings_lists_;
-};
-
 class AppControl {
  public:
-  enum LaunchMode {
-    Single = APP_CONTROL_LAUNCH_MODE_SINGLE,
-    Group = APP_CONTROL_LAUNCH_MODE_GROUP
-  };
-  enum Result {
+  enum AppControlReplyResult {
     Started = APP_CONTROL_RESULT_APP_STARTED,
     Succeeded = APP_CONTROL_RESULT_SUCCEEDED,
     Failed = APP_CONTROL_RESULT_FAILED,
@@ -114,10 +63,15 @@ class AppControl {
   AppControlResult GetLaunchMode(std::string& launch_mode);
   AppControlResult SetLaunchMode(const std::string& launch_mode);
 
+  EncodableValue SerializeAppControlToMap();
+
   AppControlResult SendLaunchRequest();
+  AppControlResult SendLaunchRequestWithReply(
+      std::shared_ptr<EventSink<EncodableValue>> reply_sink);
   AppControlResult SendTerminateRequest();
 
-  AppControlResult Reply(AppControl* reply, Result result);
+  AppControlResult Reply(std::shared_ptr<AppControl> reply,
+                         const std::string& result);
 
   AppControlResult GetExtraData(EncodableValue& value);
   AppControlResult SetExtraData(EncodableValue& value);
@@ -136,6 +90,7 @@ class AppControl {
   app_control_h handle_;
   int id_;
   static int next_id_;
+  std::shared_ptr<EventSink<EncodableValue>> reply_sink_;
 };
 
 class AppControlChannel {
@@ -153,6 +108,10 @@ class AppControlChannel {
   void UnregisterEventHandler();
   void SendAlreadyQueuedEvents();
 
+  void RegisterReplyHandler(
+      std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> events);
+  void UnregisterReplyHandler();
+
   template <typename T>
   bool GetValueFromArgs(const flutter::EncodableValue* args,
                         const char* key,
@@ -168,6 +127,9 @@ class AppControlChannel {
 
   void Dispose(std::shared_ptr<AppControl> app_control,
                std::unique_ptr<MethodResult<EncodableValue>> result);
+  void Reply(std::shared_ptr<AppControl> app_control,
+             const flutter::EncodableValue* arguments,
+             std::unique_ptr<MethodResult<EncodableValue>> result);
   void SendLaunchRequest(std::shared_ptr<AppControl> app_control,
                          const flutter::EncodableValue* arguments,
                          std::unique_ptr<MethodResult<EncodableValue>> result);
@@ -176,14 +138,16 @@ class AppControlChannel {
       const flutter::EncodableValue* arguments,
       std::unique_ptr<MethodResult<EncodableValue>> result);
 
-  bool SetAppControlData(std::shared_ptr<AppControl> app_control,
+  void SetAppControlData(std::shared_ptr<AppControl> app_control,
                          const flutter::EncodableValue* arguments,
-                         MethodResult<EncodableValue>* result);
+                         std::unique_ptr<MethodResult<EncodableValue>> result);
   void SendAppControlDataEvent(std::shared_ptr<AppControl> app_control);
 
   std::unique_ptr<MethodChannel<EncodableValue>> method_channel_;
   std::unique_ptr<EventChannel<EncodableValue>> event_channel_;
-  std::unique_ptr<EventSink<EncodableValue>> events_;
+  std::unique_ptr<EventChannel<EncodableValue>> reply_channel_;
+  std::unique_ptr<EventSink<EncodableValue>> event_sink_;
+  std::shared_ptr<EventSink<EncodableValue>> reply_sink_;
 
   // We need this queue, because there is no quarantee
   // that EventChannel on Dart side will be registered
