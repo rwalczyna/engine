@@ -10,10 +10,10 @@ namespace flutter {
 static constexpr char kChannelName[] = "tizen/internal/app_control_method";
 static constexpr char kEventChannelName[] = "tizen/internal/app_control_event";
 static constexpr char kReplyChannelName[] = "tizen/internal/app_control_reply";
+
 int AppControl::next_id_ = 0;
 
 AppControlChannel::AppControlChannel(BinaryMessenger* messenger) {
-  FT_LOGI("AppControlChannel");
   method_channel_ = std::make_unique<MethodChannel<EncodableValue>>(
       messenger, kChannelName, &StandardMethodCodec::GetInstance());
 
@@ -29,13 +29,11 @@ AppControlChannel::AppControlChannel(BinaryMessenger* messenger) {
           [this](const flutter::EncodableValue* arguments,
                  std::unique_ptr<flutter::EventSink<>>&& events)
               -> std::unique_ptr<flutter::StreamHandlerError<>> {
-            FT_LOGI("OnListen");
             RegisterEventHandler(std::move(events));
             return nullptr;
           },
           [this](const flutter::EncodableValue* arguments)
               -> std::unique_ptr<flutter::StreamHandlerError<>> {
-            FT_LOGI("OnCancel");
             UnregisterEventHandler();
             return nullptr;
           });
@@ -50,13 +48,11 @@ AppControlChannel::AppControlChannel(BinaryMessenger* messenger) {
           [this](const flutter::EncodableValue* arguments,
                  std::unique_ptr<flutter::EventSink<>>&& events)
               -> std::unique_ptr<flutter::StreamHandlerError<>> {
-            FT_LOGI("OnListen");
             RegisterReplyHandler(std::move(events));
             return nullptr;
           },
           [this](const flutter::EncodableValue* arguments)
               -> std::unique_ptr<flutter::StreamHandlerError<>> {
-            FT_LOGI("OnCancel");
             UnregisterReplyHandler();
             return nullptr;
           });
@@ -67,11 +63,10 @@ AppControlChannel::AppControlChannel(BinaryMessenger* messenger) {
 AppControlChannel::~AppControlChannel() {}
 
 void AppControlChannel::NotifyAppControl(app_control_h app_control) {
-  FT_LOGI("NotifyAppControl");
   app_control_h clone = nullptr;
   AppControlResult ret = app_control_clone(&clone, app_control);
   if (!ret) {
-    FT_LOGE("Could not clone app_control: %s", ret.message().c_str());
+    FT_LOGE("Could not clone app control: %s", ret.message().c_str());
     return;
   }
   auto app = std::make_shared<AppControl>(clone);
@@ -122,18 +117,15 @@ void AppControlChannel::HandleMethodCall(
 
 void AppControlChannel::RegisterEventHandler(
     std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> events) {
-  FT_LOGI("RegisterEventHandler");
   event_sink_ = std::move(events);
   SendAlreadyQueuedEvents();
 }
 
 void AppControlChannel::UnregisterEventHandler() {
-  FT_LOGI("UnregisterEventHandler");
   event_sink_.reset();
 }
 
 void AppControlChannel::SendAlreadyQueuedEvents() {
-  FT_LOGI("SendAlreadyQueuedEvents: %d", queue_.size());
   while (!queue_.empty()) {
     SendAppControlDataEvent(queue_.front());
     queue_.pop();
@@ -142,12 +134,10 @@ void AppControlChannel::SendAlreadyQueuedEvents() {
 
 void AppControlChannel::RegisterReplyHandler(
     std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> events) {
-  FT_LOGI("RegisterEventHandler");
   reply_sink_ = std::move(events);
 }
 
 void AppControlChannel::UnregisterReplyHandler() {
-  FT_LOGI("UnregisterReplyHandler");
   reply_sink_.reset();
 }
 
@@ -195,14 +185,12 @@ std::shared_ptr<AppControl> AppControlChannel::GetAppControl(
     FT_LOGE("Could not find AppControl with id %d", id);
     return nullptr;
   }
-  FT_LOGI("Found AppControl: %d", id);
   return map_[id];
 }
 
 void AppControlChannel::CreateAppControl(
     const EncodableValue* args,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::CreateAppControl");
   app_control_h app_control = nullptr;
   AppControlResult ret = app_control_create(&app_control);
   if (!ret) {
@@ -225,8 +213,6 @@ void AppControlChannel::Reply(
     std::shared_ptr<AppControl> app_control,
     const flutter::EncodableValue* arguments,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::Reply");
-
   int request_id;
   if (!GetValueFromArgs<int>(arguments, "requestId", request_id) ||
       map_.find(request_id) == map_.end()) {
@@ -252,8 +238,6 @@ void AppControlChannel::SendLaunchRequest(
     std::shared_ptr<AppControl> app_control,
     const flutter::EncodableValue* arguments,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::SendLaunchRequest");
-
   bool wait_for_reply = false;
   GetValueFromArgs<bool>(arguments, "waitForReply", wait_for_reply);
   AppControlResult ret;
@@ -273,8 +257,6 @@ void AppControlChannel::SendTerminateRequest(
     std::shared_ptr<AppControl> app_control,
     const flutter::EncodableValue* arguments,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::SendTerminateRequest");
-
   AppControlResult ret = app_control->SendTerminateRequest();
   if (ret) {
     result->Success();
@@ -287,13 +269,13 @@ void AppControlChannel::SetAppControlData(
     std::shared_ptr<AppControl> app_control,
     const flutter::EncodableValue* arguments,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("AppControlChannel::SetAppControlData");
-  std::string app_id, operation, mime, category, uri;
+  std::string app_id, operation, mime, category, uri, launch_mode;
   EncodableValue extra_data;
   GetValueFromArgs<std::string>(arguments, "appId", app_id);
   GetValueFromArgs<std::string>(arguments, "operation", operation);
   GetValueFromArgs<std::string>(arguments, "mime", mime);
   GetValueFromArgs<std::string>(arguments, "category", category);
+  GetValueFromArgs<std::string>(arguments, "launchMode", launch_mode);
   GetValueFromArgs<std::string>(arguments, "uri", uri);
   if (std::holds_alternative<flutter::EncodableMap>(*arguments)) {
     flutter::EncodableMap map = std::get<flutter::EncodableMap>(*arguments);
@@ -302,7 +284,7 @@ void AppControlChannel::SetAppControlData(
       extra_data = map[key];
     }
   }
-  AppControlResult results[5];
+  AppControlResult results[7];
   results[0] = app_control->SetAppId(app_id);
   if (!operation.empty()) {
     results[1] = app_control->SetOperation(operation);
@@ -316,8 +298,11 @@ void AppControlChannel::SetAppControlData(
   if (!uri.empty()) {
     results[4] = app_control->SetUri(uri);
   }
-  app_control->SetExtraData(extra_data);
-  for (int i = 0; i < 5; i++) {
+  if (!launch_mode.empty()) {
+    results[5] = app_control->SetLaunchMode(launch_mode);
+  }
+  results[6] = app_control->SetExtraData(extra_data);
+  for (int i = 0; i < 7; i++) {
     if (!results[i]) {
       result->Error("Could not set value for app control",
                     results[i].message());
@@ -328,7 +313,6 @@ void AppControlChannel::SetAppControlData(
 
 void AppControlChannel::SendAppControlDataEvent(
     std::shared_ptr<AppControl> app_control) {
-  FT_LOGI("AppControlChannel::SendAppControlDataEvent");
   EncodableValue map = app_control->SerializeAppControlToMap();
   if (!map.IsNull()) {
     event_sink_->Success(map);
@@ -336,18 +320,15 @@ void AppControlChannel::SendAppControlDataEvent(
 }
 
 AppControl::AppControl(app_control_h app_control) : id_(next_id_++) {
-  FT_LOGI("AppControl construct: %d", id_);
   handle_ = app_control;
 }
 
 AppControl::~AppControl() {
-  FT_LOGI("AppControl destruct: %d", id_);
   app_control_destroy(handle_);
 }
 
 AppControlResult AppControl::GetString(std::string& str,
                                        int func(app_control_h, char**)) {
-  FT_LOGI("AppControl::GetString");
   char* op;
   AppControlResult ret = func(handle_, &op);
   if (!ret) {
@@ -364,7 +345,6 @@ AppControlResult AppControl::GetString(std::string& str,
 
 AppControlResult AppControl::SetString(const std::string& str,
                                        int func(app_control_h, const char*)) {
-  FT_LOGI("AppControl::SetString: %s", str.c_str());
   int ret = func(handle_, str.c_str());
   return AppControlResult(ret);
 }
@@ -430,17 +410,11 @@ AppControlResult AppControl::SetExtraData(EncodableValue& value) {
         continue;
       }
       std::string key = std::get<std::string>(v.first);
-      // if (std::holds_alternative<std::string>(v.second)) {
-      //   std::string string_value = std::get<std::string>(v.second);
-      //   AddExtraData(key, string_value);
-      // } else if (std::holds_alternative<EncodableList>(v.second)) {
-      //   EncodableList list_value = std::get<EncodableList>(v.second);
-      //   AddExtraDataList(key, list_value);
-      // } else {
-      //   FT_LOGE("Invalid type, omitting");
-      //   continue;
-      // }
-      AddExtraData(key, v.second);
+      AppControlResult ret = AddExtraData(key, v.second);
+      if (!ret) {
+        FT_LOGE("Invalid data at %s, omitting", key.c_str());
+        continue;
+      }
     }
   } else {
     return AppControlResult(APP_ERROR_INVALID_PARAMETER);
@@ -525,20 +499,19 @@ AppControlResult AppControl::SetLaunchMode(const std::string& launch_mode) {
 }
 
 EncodableValue AppControl::SerializeAppControlToMap() {
-  FT_LOGI("AppControl::SerializeAppControlToMap");
-  std::string app_id, operation, mime, category, uri, caller_id;
-  AppControlResult results[6];
+  std::string app_id, operation, mime, category, uri, caller_id, launch_mode;
+  AppControlResult results[7];
   results[0] = GetAppId(app_id);
   results[1] = GetOperation(operation);
   results[2] = GetMime(mime);
   results[3] = GetCategory(category);
   results[4] = GetUri(uri);
+  results[5] = GetLaunchMode(launch_mode);
   // Caller Id is optional
   GetCaller(caller_id);
   EncodableValue extra_data;
-  // TODO: verify ret
-  GetExtraData(extra_data);
-  for (int i = 0; i < 5; i++) {
+  results[6] = GetExtraData(extra_data);
+  for (int i = 0; i < 7; i++) {
     if (!results[i]) {
       return EncodableValue();
     }
@@ -551,6 +524,7 @@ EncodableValue AppControl::SerializeAppControlToMap() {
   map[EncodableValue("category")] = EncodableValue(category);
   map[EncodableValue("uri")] = EncodableValue(uri);
   map[EncodableValue("callerId")] = EncodableValue(caller_id);
+  map[EncodableValue("launchMode")] = EncodableValue(launch_mode);
   map[EncodableValue("extraData")] = extra_data;
 
   return EncodableValue(map);
@@ -567,7 +541,6 @@ AppControlResult AppControl::SendLaunchRequestWithReply(
   auto on_reply = [](app_control_h request, app_control_h reply,
                      app_control_result_e result, void* user_data) {
     AppControl* app_control = static_cast<AppControl*>(user_data);
-    FT_LOGI("OnAppControlReplyReceived");
     app_control_h clone = nullptr;
     AppControlResult ret = app_control_clone(&clone, reply);
     if (!ret) {
@@ -600,7 +573,6 @@ AppControlResult AppControl::SendLaunchRequestWithReply(
 }
 
 AppControlResult AppControl::SendTerminateRequest() {
-  FT_LOGI("AppControlChannel::SendTerminateRequest");
   AppControlResult ret = app_control_send_terminate_request(handle_);
   return ret;
 }
