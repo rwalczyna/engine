@@ -32,15 +32,10 @@ struct AppControlResult {
   int error_code;
 };
 
+class AppControlChannel;
+
 class AppControl {
  public:
-  enum AppControlReplyResult {
-    Started = APP_CONTROL_RESULT_APP_STARTED,
-    Succeeded = APP_CONTROL_RESULT_SUCCEEDED,
-    Failed = APP_CONTROL_RESULT_FAILED,
-    Cancelled = APP_CONTROL_RESULT_CANCELED
-  };
-
   AppControl(app_control_h app_control);
   ~AppControl();
 
@@ -67,7 +62,8 @@ class AppControl {
 
   AppControlResult SendLaunchRequest();
   AppControlResult SendLaunchRequestWithReply(
-      std::shared_ptr<EventSink<EncodableValue>> reply_sink);
+      std::shared_ptr<EventSink<EncodableValue>> reply_sink,
+      AppControlChannel* manager);
   AppControlResult SendTerminateRequest();
 
   AppControlResult Reply(std::shared_ptr<AppControl> reply,
@@ -75,6 +71,9 @@ class AppControl {
 
   AppControlResult GetExtraData(EncodableValue& value);
   AppControlResult SetExtraData(EncodableValue& value);
+
+  void SetManager(AppControlChannel* m);
+  AppControlChannel* GetManager();
 
  private:
   AppControlResult GetString(std::string& str, int func(app_control_h, char**));
@@ -91,6 +90,8 @@ class AppControl {
   int id_;
   static int next_id_;
   std::shared_ptr<EventSink<EncodableValue>> reply_sink_;
+
+  AppControlChannel* manager_;
 };
 
 class AppControlChannel {
@@ -99,6 +100,10 @@ class AppControlChannel {
   virtual ~AppControlChannel();
 
   void NotifyAppControl(app_control_h app_control);
+
+  void AddExistingAppControl(std::shared_ptr<AppControl> app_control) {
+    map_.insert({app_control->GetId(), app_control});
+  }
 
  private:
   void HandleMethodCall(const MethodCall<EncodableValue>& method_call,

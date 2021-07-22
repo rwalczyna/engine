@@ -63,6 +63,7 @@ AppControlChannel::AppControlChannel(BinaryMessenger* messenger) {
 AppControlChannel::~AppControlChannel() {}
 
 void AppControlChannel::NotifyAppControl(app_control_h app_control) {
+    FT_LOGE("AppControlChannel::NotifyAppControl");
   app_control_h clone = nullptr;
   AppControlResult ret = app_control_clone(&clone, app_control);
   if (!ret) {
@@ -230,7 +231,7 @@ void AppControlChannel::Reply(
   if (ret) {
     result->Success();
   } else {
-    result->Error(ret.message());
+    result->Error("Could not reply to app control", ret.message());
   }
 }
 
@@ -242,10 +243,11 @@ void AppControlChannel::SendLaunchRequest(
   GetValueFromArgs<bool>(arguments, "waitForReply", wait_for_reply);
   AppControlResult ret;
   if (wait_for_reply) {
-    ret = app_control->SendLaunchRequestWithReply(std::move(reply_sink_));
+    ret = app_control->SendLaunchRequestWithReply(std::move(reply_sink_), this);
+  } else {
+    ret = app_control->SendLaunchRequest();
   }
 
-  ret = app_control->SendLaunchRequest();
   if (ret) {
     result->Success();
   } else {
@@ -422,6 +424,14 @@ AppControlResult AppControl::SetExtraData(EncodableValue& value) {
   return AppControlResult();
 }
 
+void AppControl::SetManager(AppControlChannel* m) {
+  manager_ = m;
+}
+
+AppControlChannel* AppControl::GetManager() {
+  return manager_;
+}
+
 AppControlResult AppControl::GetOperation(std::string& operation) {
   return GetString(operation, app_control_get_operation);
 }
@@ -537,7 +547,9 @@ AppControlResult AppControl::SendLaunchRequest() {
 }
 
 AppControlResult AppControl::SendLaunchRequestWithReply(
-    std::shared_ptr<EventSink<EncodableValue>> reply_sink) {
+    std::shared_ptr<EventSink<EncodableValue>> reply_sink,
+    AppControlChannel* manager) {
+  SetManager(manager);
   auto on_reply = [](app_control_h request, app_control_h reply,
                      app_control_result_e result, void* user_data) {
     AppControl* app_control = static_cast<AppControl*>(user_data);
@@ -548,12 +560,12 @@ AppControlResult AppControl::SendLaunchRequestWithReply(
       return;
     }
 
-    AppControl app_control_reply = AppControl(clone);
+    std::shared_ptr<AppControl> app_control_reply =
+        std::make_shared<AppControl>(clone);
     EncodableMap map;
     map[EncodableValue("id")] = EncodableValue(app_control->GetId());
-    // TODO: put appcontrol into map_ of AppControlChannel or disable using
-    // reply app control on dart side
-    map[EncodableValue("reply")] = app_control_reply.SerializeAppControlToMap();
+    map[EncodableValue("reply")] =
+        app_control_reply->SerializeAppControlToMap();
     if (result == APP_CONTROL_RESULT_APP_STARTED) {
       map[EncodableValue("result")] = EncodableValue("AppStarted");
     } else if (result == APP_CONTROL_RESULT_SUCCEEDED) {
@@ -565,6 +577,8 @@ AppControlResult AppControl::SendLaunchRequestWithReply(
     }
 
     app_control->reply_sink_->Success(EncodableValue(map));
+    app_control->GetManager()->AddExistingAppControl(
+        std::move(app_control_reply));
   };
   reply_sink_ = std::move(reply_sink);
   AppControlResult ret =
@@ -591,9 +605,9 @@ AppControlResult AppControl::Reply(std::shared_ptr<AppControl> reply,
   } else {
     return AppControlResult(APP_CONTROL_ERROR_INVALID_PARAMETER);
   }
-  int ret = app_control_reply_to_launch_request(reply->Handle(), this->handle_,
-                                                result_e);
-  return AppControlResult(ret);
+  AppControlResult ret = app_control_reply_to_launch_request(
+      reply->Handle(), this->handle_, result_e);
+  return ret;
 }
 
 AppControlResult AppControl::AddExtraData(std::string key,
