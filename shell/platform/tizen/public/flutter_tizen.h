@@ -6,9 +6,9 @@
 #ifndef FLUTTER_SHELL_PLATFORM_TIZEN_PUBLIC_FLUTTER_TIZEN_H_
 #define FLUTTER_SHELL_PLATFORM_TIZEN_PUBLIC_FLUTTER_TIZEN_H_
 
+#include <app.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <app.h>
 
 #include "flutter_export.h"
 #include "flutter_messenger.h"
@@ -92,7 +92,8 @@ FlutterDesktopEngineGetMessenger(FlutterDesktopEngineRef engine);
 
 // Posts an app control to the engine instance.
 FLUTTER_EXPORT void FlutterDesktopNotifyAppControl(
-    FlutterDesktopEngineRef engine, app_control_h app_control);
+    FlutterDesktopEngineRef engine,
+    app_control_h app_control);
 
 // Posts a locale change notification to the engine instance.
 FLUTTER_EXPORT void FlutterDesktopNotifyLocaleChange(

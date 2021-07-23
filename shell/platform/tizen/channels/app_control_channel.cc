@@ -413,8 +413,8 @@ AppControlResult AppControl::SetExtraData(EncodableValue& value) {
       std::string key = std::get<std::string>(v.first);
       AppControlResult ret = AddExtraData(key, v.second);
       if (!ret) {
-      FT_LOG(Error) << "Invalid data at " << key << ", omitting";
-      continue;
+        FT_LOG(Error) << "Invalid data at " << key << ", omitting";
+        continue;
       }
     }
   } else {
