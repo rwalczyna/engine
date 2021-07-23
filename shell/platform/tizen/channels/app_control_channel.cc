@@ -63,17 +63,16 @@ AppControlChannel::AppControlChannel(BinaryMessenger* messenger) {
 AppControlChannel::~AppControlChannel() {}
 
 void AppControlChannel::NotifyAppControl(app_control_h app_control) {
-    FT_LOGE("AppControlChannel::NotifyAppControl");
   app_control_h clone = nullptr;
   AppControlResult ret = app_control_clone(&clone, app_control);
   if (!ret) {
-    FT_LOGE("Could not clone app control: %s", ret.message().c_str());
+    FT_LOG(Error) << "Could not clone app control " << ret.message();
     return;
   }
   auto app = std::make_shared<AppControl>(clone);
   if (!event_sink_) {
     queue_.push(app);
-    FT_LOGI("EventChannel not set yet");
+    FT_LOG(Info) << "EventChannel not set yet ";
   } else {
     SendAppControlDataEvent(app);
   }
@@ -83,7 +82,7 @@ void AppControlChannel::NotifyAppControl(app_control_h app_control) {
 void AppControlChannel::HandleMethodCall(
     const MethodCall<EncodableValue>& method_call,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
-  FT_LOGI("HandleMethodCall : %s", method_call.method_name().c_str());
+  FT_LOG(Info) << "HandleMethodCall " << method_call.method_name();
   const auto arguments = method_call.arguments();
   const auto& method_name = method_call.method_name();
 
@@ -155,7 +154,7 @@ bool AppControlChannel::GetValueFromArgs(const flutter::EncodableValue* args,
         return true;
       }
     }
-    FT_LOGI("Key %s not found", key);
+    FT_LOG(Info) << "Key " << key << "not found";
   }
   return false;
 }
@@ -178,12 +177,12 @@ std::shared_ptr<AppControl> AppControlChannel::GetAppControl(
     const EncodableValue* args) {
   int id;
   if (!GetValueFromArgs<int>(args, "id", id)) {
-    FT_LOGE("Could not find AppControl with id %d", id);
+    FT_LOG(Error) << "Could not find AppControl with id " << id;
     return nullptr;
   }
 
   if (map_.find(id) == map_.end()) {
-    FT_LOGE("Could not find AppControl with id %d", id);
+    FT_LOG(Error) << "Could not find AppControl with id " << id;
     return nullptr;
   }
   return map_[id];
@@ -358,7 +357,7 @@ bool _app_control_extra_data_cb(app_control_h app,
   bool is_array = false;
   int ret = app_control_is_extra_data_array(app, key, &is_array);
   if (ret != APP_CONTROL_ERROR_NONE) {
-    FT_LOGE("app_control_is_extra_data_array() failed at key %s", key);
+    FT_LOG(Error) << "app_control_is_extra_data_array() failed at key " << key;
     return false;
   }
 
@@ -367,7 +366,7 @@ bool _app_control_extra_data_cb(app_control_h app,
     int length = 0;
     ret = app_control_get_extra_data_array(app, key, &strings, &length);
     if (ret != APP_CONTROL_ERROR_NONE) {
-      FT_LOGE("app_control_get_extra_data() failed at key %s", key);
+      FT_LOG(Error) << "app_control_get_extra_data() failed at key " << key;
       return false;
     }
     EncodableList list;
@@ -382,7 +381,7 @@ bool _app_control_extra_data_cb(app_control_h app,
     char* value;
     ret = app_control_get_extra_data(app, key, &value);
     if (ret != APP_CONTROL_ERROR_NONE) {
-      FT_LOGE("app_control_get_extra_data() failed at key %s", key);
+      FT_LOG(Error) << "app_control_get_extra_data() failed at key " << key;
       return false;
     }
     extra_data->insert(
@@ -408,14 +407,14 @@ AppControlResult AppControl::SetExtraData(EncodableValue& value) {
     EncodableMap map = std::get<EncodableMap>(value);
     for (const auto& v : map) {
       if (!std::holds_alternative<std::string>(v.first)) {
-        FT_LOGE("Key for extra data has to be string, omitting");
+        FT_LOG(Error) << "Key for extra data has to be string, omitting";
         continue;
       }
       std::string key = std::get<std::string>(v.first);
       AppControlResult ret = AddExtraData(key, v.second);
       if (!ret) {
-        FT_LOGE("Invalid data at %s, omitting", key.c_str());
-        continue;
+      FT_LOG(Error) << "Invalid data at " << key << ", omitting";
+      continue;
       }
     }
   } else {
@@ -556,7 +555,7 @@ AppControlResult AppControl::SendLaunchRequestWithReply(
     app_control_h clone = nullptr;
     AppControlResult ret = app_control_clone(&clone, reply);
     if (!ret) {
-      FT_LOGE("Could not clone app_control: %s", ret.message().c_str());
+      FT_LOG(Error) << "Could not clone app_control: " << ret.message();
       return;
     }
 

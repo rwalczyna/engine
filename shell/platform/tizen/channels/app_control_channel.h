@@ -14,7 +14,7 @@
 #include "flutter/shell/platform/common/client_wrapper/include/flutter/event_channel.h"
 #include "flutter/shell/platform/common/client_wrapper/include/flutter/method_channel.h"
 #include "flutter/shell/platform/common/client_wrapper/include/flutter/standard_method_codec.h"
-#include "flutter/shell/platform/tizen/tizen_log.h"
+#include "flutter/shell/platform/tizen/logger.h"
 
 class FlutterTizenEngine;
 
@@ -85,7 +85,6 @@ class AppControl {
   AppControlResult AddExtraData(std::string key, EncodableValue value);
   AppControlResult AddExtraDataList(std::string& key, EncodableList& list);
 
-  // EncodableMap extra_data_;
   app_control_h handle_;
   int id_;
   static int next_id_;
@@ -157,7 +156,6 @@ class AppControlChannel {
   // We need this queue, because there is no quarantee
   // that EventChannel on Dart side will be registered
   // before native OnAppControl event
-  // TODO: Add limit for queue elements
   std::queue<std::shared_ptr<AppControl>> queue_;
 
   std::unordered_map<int, std::shared_ptr<AppControl>> map_;
