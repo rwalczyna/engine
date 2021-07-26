@@ -169,13 +169,13 @@ AppControlResult AppControl::GetLaunchMode(std::string& launch_mode) {
     return AppControlResult(ret);
   }
   launch_mode =
-      (launch_mode_e == APP_CONTROL_LAUNCH_MODE_SINGLE ? "Single" : "Group");
+      (launch_mode_e == APP_CONTROL_LAUNCH_MODE_SINGLE ? "single" : "group");
   return AppControlResult(APP_CONTROL_ERROR_NONE);
 }
 
 AppControlResult AppControl::SetLaunchMode(const std::string& launch_mode) {
   app_control_launch_mode_e launch_mode_e;
-  if (launch_mode.compare("Single")) {
+  if (launch_mode.compare("single")) {
     launch_mode_e = APP_CONTROL_LAUNCH_MODE_SINGLE;
   } else {
     launch_mode_e = APP_CONTROL_LAUNCH_MODE_GROUP;
@@ -243,13 +243,13 @@ AppControlResult AppControl::SendLaunchRequestWithReply(
     map[EncodableValue("reply")] =
         app_control_reply->SerializeAppControlToMap();
     if (result == APP_CONTROL_RESULT_APP_STARTED) {
-      map[EncodableValue("result")] = EncodableValue("AppStarted");
+      map[EncodableValue("result")] = EncodableValue("appStarted");
     } else if (result == APP_CONTROL_RESULT_SUCCEEDED) {
-      map[EncodableValue("result")] = EncodableValue("Succeeded");
+      map[EncodableValue("result")] = EncodableValue("succeeded");
     } else if (result == APP_CONTROL_RESULT_FAILED) {
-      map[EncodableValue("result")] = EncodableValue("Failed");
+      map[EncodableValue("result")] = EncodableValue("failed");
     } else if (result == APP_CONTROL_RESULT_CANCELED) {
-      map[EncodableValue("result")] = EncodableValue("Cancelled");
+      map[EncodableValue("result")] = EncodableValue("cancelled");
     }
 
     app_control->reply_sink_->Success(EncodableValue(map));
@@ -270,13 +270,13 @@ AppControlResult AppControl::SendTerminateRequest() {
 AppControlResult AppControl::Reply(std::shared_ptr<AppControl> reply,
                                    const std::string& result) {
   app_control_result_e result_e;
-  if (result == "AppStarted") {
+  if (result == "appStarted") {
     result_e = APP_CONTROL_RESULT_APP_STARTED;
-  } else if (result == "Succeeded") {
+  } else if (result == "succeeded") {
     result_e = APP_CONTROL_RESULT_SUCCEEDED;
-  } else if (result == "Failed") {
+  } else if (result == "failed") {
     result_e = APP_CONTROL_RESULT_FAILED;
-  } else if (result == "Cancelled") {
+  } else if (result == "cancelled") {
     result_e = APP_CONTROL_RESULT_CANCELED;
   } else {
     return AppControlResult(APP_CONTROL_ERROR_INVALID_PARAMETER);
