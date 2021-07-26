@@ -112,6 +112,7 @@ template("embedder") {
     public = _public_headers
 
     sources = [
+      "channels/app_control.cc",
       "channels/app_control_channel.cc",
       "channels/key_event_channel.cc",
       "channels/lifecycle_channel.cc",

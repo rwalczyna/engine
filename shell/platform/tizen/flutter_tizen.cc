@@ -119,7 +119,7 @@ void FlutterDesktopMessengerSetCallback(FlutterDesktopMessengerRef messenger,
 }
 
 void FlutterDesktopNotifyAppControl(FlutterDesktopEngineRef engine,
-                                    app_control_h app_control) {
+                                    void* app_control) {
   EngineFromHandle(engine)->app_control_channel->NotifyAppControl(app_control);
 }
 

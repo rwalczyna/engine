@@ -93,7 +93,7 @@ FlutterDesktopEngineGetMessenger(FlutterDesktopEngineRef engine);
 // Posts an app control to the engine instance.
 FLUTTER_EXPORT void FlutterDesktopNotifyAppControl(
     FlutterDesktopEngineRef engine,
-    app_control_h app_control);
+    void* app_control);
 
 // Posts a locale change notification to the engine instance.
 FLUTTER_EXPORT void FlutterDesktopNotifyLocaleChange(
