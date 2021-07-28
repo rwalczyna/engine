@@ -112,8 +112,6 @@ template("embedder") {
     public = _public_headers
 
     sources = [
-      "channels/app_control.cc",
-      "channels/app_control_channel.cc",
       "channels/key_event_channel.cc",
       "channels/lifecycle_channel.cc",
       "channels/navigation_channel.cc",
@@ -152,6 +150,8 @@ template("embedder") {
 
     if (embedder_for_target) {
       sources += [
+        "channels/app_control.cc",
+        "channels/app_control_channel.cc",
         "channels/platform_channel.cc",
         "channels/settings_channel.cc",
         "channels/settings_channel_tizen.cc",

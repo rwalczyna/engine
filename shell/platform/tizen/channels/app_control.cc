@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include "app_control.h"
-#include "app_control_channel.h"
+#include "flutter/shell/platform/tizen/channels/app_control_channel.h"
 
 #include "flutter/shell/platform/common/client_wrapper/include/flutter/event_stream_handler_functions.h"
 
@@ -84,17 +84,17 @@ bool OnAppControlExtraDataCallback(app_control_h app,
   return true;
 }
 
-AppControlResult AppControl::GetExtraData(EncodableValue& value) {
+AppControlResult AppControl::GetExtraData(EncodableMap& value) {
   EncodableMap extra_data;
   int ret = app_control_foreach_extra_data(
       handle_, OnAppControlExtraDataCallback, &extra_data);
   if (ret == APP_CONTROL_ERROR_NONE) {
-    value = EncodableValue(extra_data);
+    value = std::move(extra_data);
   }
   return AppControlResult(ret);
 }
 
-AppControlResult AppControl::SetExtraData(EncodableMap& map) {
+AppControlResult AppControl::SetExtraData(const EncodableMap& map) {
   for (const auto& v : map) {
     if (!std::holds_alternative<std::string>(v.first)) {
       FT_LOG(Error) << "Key for extra data has to be string, omitting";
@@ -193,9 +193,9 @@ EncodableValue AppControl::SerializeAppControlToMap() {
   results[3] = GetCategory(category);
   results[4] = GetUri(uri);
   results[5] = GetLaunchMode(launch_mode);
-  // Caller Id is optional
+  // Caller Id is optional.
   GetCaller(caller_id);
-  EncodableValue extra_data;
+  EncodableMap extra_data;
   results[6] = GetExtraData(extra_data);
   for (int i = 0; i < 7; i++) {
     if (!results[i]) {
@@ -211,7 +211,7 @@ EncodableValue AppControl::SerializeAppControlToMap() {
   map[EncodableValue("uri")] = EncodableValue(uri);
   map[EncodableValue("callerId")] = EncodableValue(caller_id);
   map[EncodableValue("launchMode")] = EncodableValue(launch_mode);
-  map[EncodableValue("extraData")] = extra_data;
+  map[EncodableValue("extraData")] = EncodableValue(extra_data);
 
   return EncodableValue(map);
 }

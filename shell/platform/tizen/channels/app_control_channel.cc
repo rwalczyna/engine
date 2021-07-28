@@ -26,38 +26,36 @@ AppControlChannel::AppControlChannel(BinaryMessenger* messenger) {
   event_channel_ = std::make_unique<EventChannel<EncodableValue>>(
       messenger, kEventChannelName, &StandardMethodCodec::GetInstance());
 
-  auto event_channel_handler =
-      std::make_unique<flutter::StreamHandlerFunctions<>>(
-          [this](const EncodableValue* arguments,
-                 std::unique_ptr<flutter::EventSink<>>&& events)
-              -> std::unique_ptr<flutter::StreamHandlerError<>> {
-            RegisterEventHandler(std::move(events));
-            return nullptr;
-          },
-          [this](const EncodableValue* arguments)
-              -> std::unique_ptr<flutter::StreamHandlerError<>> {
-            UnregisterEventHandler();
-            return nullptr;
-          });
+  auto event_channel_handler = std::make_unique<StreamHandlerFunctions<>>(
+      [this](const EncodableValue* arguments,
+             std::unique_ptr<EventSink<>>&& events)
+          -> std::unique_ptr<StreamHandlerError<>> {
+        RegisterEventHandler(std::move(events));
+        return nullptr;
+      },
+      [this](const EncodableValue* arguments)
+          -> std::unique_ptr<StreamHandlerError<>> {
+        UnregisterEventHandler();
+        return nullptr;
+      });
 
   event_channel_->SetStreamHandler(std::move(event_channel_handler));
 
   reply_channel_ = std::make_unique<EventChannel<EncodableValue>>(
       messenger, kReplyChannelName, &StandardMethodCodec::GetInstance());
 
-  auto reply_channel_handler =
-      std::make_unique<flutter::StreamHandlerFunctions<>>(
-          [this](const EncodableValue* arguments,
-                 std::unique_ptr<flutter::EventSink<>>&& events)
-              -> std::unique_ptr<flutter::StreamHandlerError<>> {
-            RegisterReplyHandler(std::move(events));
-            return nullptr;
-          },
-          [this](const EncodableValue* arguments)
-              -> std::unique_ptr<flutter::StreamHandlerError<>> {
-            UnregisterReplyHandler();
-            return nullptr;
-          });
+  auto reply_channel_handler = std::make_unique<StreamHandlerFunctions<>>(
+      [this](const EncodableValue* arguments,
+             std::unique_ptr<EventSink<>>&& events)
+          -> std::unique_ptr<StreamHandlerError<>> {
+        RegisterReplyHandler(std::move(events));
+        return nullptr;
+      },
+      [this](const EncodableValue* arguments)
+          -> std::unique_ptr<StreamHandlerError<>> {
+        UnregisterReplyHandler();
+        return nullptr;
+      });
 
   reply_channel_->SetStreamHandler(std::move(reply_channel_handler));
 }
@@ -117,7 +115,7 @@ void AppControlChannel::HandleMethodCall(
 }
 
 void AppControlChannel::RegisterEventHandler(
-    std::unique_ptr<flutter::EventSink<EncodableValue>> events) {
+    std::unique_ptr<EventSink<EncodableValue>> events) {
   event_sink_ = std::move(events);
   SendAlreadyQueuedEvents();
 }
@@ -134,7 +132,7 @@ void AppControlChannel::SendAlreadyQueuedEvents() {
 }
 
 void AppControlChannel::RegisterReplyHandler(
-    std::unique_ptr<flutter::EventSink<EncodableValue>> events) {
+    std::unique_ptr<EventSink<EncodableValue>> events) {
   reply_sink_ = std::move(events);
 }
 
@@ -146,8 +144,8 @@ template <typename T>
 bool AppControlChannel::GetValueFromArgs(const EncodableValue* args,
                                          const char* key,
                                          T& out) {
-  if (std::holds_alternative<flutter::EncodableMap>(*args)) {
-    flutter::EncodableMap map = std::get<flutter::EncodableMap>(*args);
+  if (std::holds_alternative<EncodableMap>(*args)) {
+    EncodableMap map = std::get<EncodableMap>(*args);
     if (map.find(EncodableValue(key)) != map.end()) {
       EncodableValue value = map[EncodableValue(key)];
       if (std::holds_alternative<T>(value)) {

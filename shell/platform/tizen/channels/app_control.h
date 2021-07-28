@@ -22,7 +22,7 @@ struct AppControlResult {
   AppControlResult() : error_code(APP_CONTROL_ERROR_NONE){};
   AppControlResult(int code) : error_code(code) {}
 
-  // Returns false on error
+  // Returns false on error.
   operator bool() const { return (APP_CONTROL_ERROR_NONE == error_code); }
 
   std::string message() { return get_error_message(error_code); }
@@ -65,8 +65,8 @@ class AppControl {
   AppControlResult Reply(std::shared_ptr<AppControl> reply,
                          const std::string& result);
 
-  AppControlResult GetExtraData(EncodableValue& value);
-  AppControlResult SetExtraData(EncodableMap& value);
+  AppControlResult GetExtraData(EncodableMap& value);
+  AppControlResult SetExtraData(const EncodableMap& value);
 
   void SetManager(AppControlChannel* m);
   AppControlChannel* GetManager();
@@ -90,4 +90,5 @@ class AppControl {
 };
 
 }  // namespace flutter
+
 #endif  // EMBEDDER_APP_CONTROL_H_

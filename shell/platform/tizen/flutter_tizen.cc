@@ -118,10 +118,12 @@ void FlutterDesktopMessengerSetCallback(FlutterDesktopMessengerRef messenger,
                                                             user_data);
 }
 
+#ifndef __X64_SHELL__
 void FlutterDesktopNotifyAppControl(FlutterDesktopEngineRef engine,
                                     void* app_control) {
   EngineFromHandle(engine)->app_control_channel->NotifyAppControl(app_control);
 }
+#endif
 
 void FlutterDesktopNotifyLocaleChange(FlutterDesktopEngineRef engine) {
   EngineFromHandle(engine)->SetupLocales();

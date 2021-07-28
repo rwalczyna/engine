@@ -83,4 +83,5 @@ class AppControlChannel {
 };
 
 }  // namespace flutter
+
 #endif  // EMBEDDER_APP_CONTROL_CHANNEL_H_
