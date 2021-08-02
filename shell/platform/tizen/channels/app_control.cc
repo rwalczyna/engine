@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 #include "app_control.h"
-#include "flutter/shell/platform/tizen/channels/app_control_channel.h"
-
 #include "flutter/shell/platform/common/client_wrapper/include/flutter/event_stream_handler_functions.h"
+#include "flutter/shell/platform/tizen/channels/app_control_channel.h"
 
 namespace flutter {
 

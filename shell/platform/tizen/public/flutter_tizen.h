@@ -89,12 +89,10 @@ FlutterDesktopGetPluginRegistrar(FlutterDesktopEngineRef engine,
 FLUTTER_EXPORT FlutterDesktopMessengerRef
 FlutterDesktopEngineGetMessenger(FlutterDesktopEngineRef engine);
 
-#ifndef __X64_SHELL__
 // Posts an app control to the engine instance.
 FLUTTER_EXPORT void FlutterDesktopNotifyAppControl(
     FlutterDesktopEngineRef engine,
     void* app_control);
-#endif
 
 // Posts a locale change notification to the engine instance.
 FLUTTER_EXPORT void FlutterDesktopNotifyLocaleChange(

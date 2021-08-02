@@ -11,6 +11,9 @@
 #include "flutter/shell/platform/common/client_wrapper/include/flutter/plugin_registrar.h"
 #include "flutter/shell/platform/common/incoming_message_dispatcher.h"
 #include "flutter/shell/platform/embedder/embedder.h"
+#ifndef __X64_SHELL__
+#include "flutter/shell/platform/tizen/channels/app_control_channel.h"
+#endif
 #include "flutter/shell/platform/tizen/channels/key_event_channel.h"
 #include "flutter/shell/platform/tizen/channels/lifecycle_channel.h"
 #include "flutter/shell/platform/tizen/channels/navigation_channel.h"
@@ -24,11 +27,6 @@
 #include "flutter/shell/platform/tizen/public/flutter_tizen.h"
 #include "flutter/shell/platform/tizen/tizen_event_loop.h"
 #include "flutter/shell/platform/tizen/tizen_renderer.h"
-
-#ifndef __X64_SHELL__
-#include "flutter/shell/platform/tizen/channels/app_control_channel.h"
-#endif
-
 #ifdef TIZEN_RENDERER_EVAS_GL
 #include "flutter/shell/platform/tizen/tizen_renderer_evas_gl.h"
 #else
