@@ -68,15 +68,13 @@ class AppControl {
   AppControlResult GetExtraData(EncodableMap& value);
   AppControlResult SetExtraData(const EncodableMap& value);
 
-  void SetManager(AppControlChannel* m);
+  void SetManager(AppControlChannel* manager);
   AppControlChannel* GetManager();
 
  private:
   AppControlResult GetString(std::string& str, int func(app_control_h, char**));
   AppControlResult SetString(const std::string& str,
                              int func(app_control_h, const char*));
-  AppControlResult WriteExtraDataStringToHandle();
-  AppControlResult WriteExtraDataToHandle();
 
   AppControlResult AddExtraData(std::string key, EncodableValue value);
   AppControlResult AddExtraDataList(std::string& key, EncodableList& list);

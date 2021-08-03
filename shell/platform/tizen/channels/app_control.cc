@@ -52,7 +52,7 @@ bool OnAppControlExtraDataCallback(app_control_h app,
   }
 
   if (is_array) {
-    char** strings = NULL;
+    char** strings = nullptr;
     int length = 0;
     ret = app_control_get_extra_data_array(app, key, &strings, &length);
     if (ret != APP_CONTROL_ERROR_NONE) {
@@ -69,7 +69,7 @@ bool OnAppControlExtraDataCallback(app_control_h app,
     extra_data->insert(
         {EncodableValue(std::string(key)), EncodableValue(list)});
   } else {
-    char* value;
+    char* value = nullptr;
     ret = app_control_get_extra_data(app, key, &value);
     if (ret != APP_CONTROL_ERROR_NONE) {
       FT_LOG(Error) << "app_control_get_extra_data() failed at key " << key;

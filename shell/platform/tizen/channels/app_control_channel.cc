@@ -183,7 +183,7 @@ void AppControlChannel::CreateAppControl(
   }
   auto app = std::make_unique<AppControl>(app_control);
   int id = app->GetId();
-  map_.insert({app->GetId(), std::move(app)});
+  map_.insert({id, std::move(app)});
   result->Success(EncodableValue(id));
 }
 
